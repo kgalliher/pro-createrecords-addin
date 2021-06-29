@@ -1,28 +1,40 @@
 ﻿#region "CLASS DOCUMENTATION"
 /*
  * ***************************************************************************************************************************************************************
- * Project:         Name of the Project
- * Class:           Name of the Class in the Project
- * Version:         1.0
- * Author:          Name of the person(s) who wrote the script
- * Date Created:    Date Project Created (mm/dd/yyyy)
- * Date Launched:   Date Project launched for general use (mm/dd/yyyy)
- * Dept:            GIS Division
- * Location:        Project file location (...\ArcAdmin\ProjectFolder...)
- * Revisions:       mm/dd/yyyy -programmer-: Summary of modifications to code or Docked Window
+ * Project:         Create AFC Records
+ * Class:           CreateRecordsPaneViewModel.cs
+ * Version:         0.1.0
+ * Author:          John W. Fell
+ * Date Created:    06/21/2021
+ * Date Launched:   TBD
+ * Dept:            GIS Deparment
+ * Location:        https://github.com/dcadgis/pro-createrecords-addin/
+ * Revisions:       
  * ***************************************************************************************************************************************************************
  * 
  * CLASS
- * PURPOSE:     A brief explanation for, why this class is needed in the project.
- *             (example- This class contains methods used for querying data in GPUB.)
+ * PURPOSE:     Business logic for MVVM pattern dockpane used in ArcGIS Pro.
+ *              
  *
  * CLASS
- * DESCRIPTION: Describe the functionality or controls contained in the class
- *              (example- This class accepts parameters from AnotherClass.cs to query GPUB and populate a ListArray, which is used by YetAnotherClass.cs.)
- *
+ * DESCRIPTION: This class generates the list of AFC logs to display in the 
+ *              dock pane as well as other features such as onclick button
+ *              events.
  * CLASS
- * PROPERTIES:   Describe the properties (protected or otherwise) for this class.
- *              (example- layer internal variable from AnotherClass.cs)
+ * PROPERTIES:   AFCLogs  - The ReadOnlyObservableCollection object that is
+ *                          bound to the XAML ListBox object in the 
+ *                          CreateRecordsPane.xaml file.
+ *               _afclogs - The ObservableCollection object that is manipulated
+ *                          in the SearchForAFCLogs() method. The database view
+ *                          GEDT.ADM.AFC_LOG_VW is read using a QueryFilter and
+ *                          the resulting RowCursor object populates AFC Log class
+ *                          objects and adds them to this collection. This property
+ *                          is manipulated in the business logic but is not the ultimate
+ *                          data source. This property is bounds to the _afclogsRO property
+ *                          which is returned by the AFCLogs property bound to the dock pane
+ *                          control in the xaml.
+ *                          
+
  *
  * CLASS 
  * METHODS:     Provide a list of the Methods available in this class and a brief explanation of their function.
@@ -150,13 +162,13 @@ namespace pro_createrecords_addin
             
         }
 
-        /// <summary>
-        /// A duplicate property for the SearchUtilities
-        /// that can be referenced in the user control
-        /// dockpane.
-        /// </summary>
-        
+        #region Properties
 
+
+        /// <summary>
+        /// Property containing list of AFC logs
+        /// that is bounds to the MVVM xaml dock pane.
+        /// </summary>
         public ReadOnlyObservableCollection<AFCLog> AFCLogs
         {
 
@@ -176,15 +188,6 @@ namespace pro_createrecords_addin
             {
                 SetProperty(ref _heading, value, () => Heading);
             }
-        }
-
-        /// <summary>
-        /// Override the default behavior when the dockpane's help icon is clicked
-        /// or the F1 key is pressed.
-        /// </summary>
-        protected override void OnHelpRequested()
-        {
-            System.Diagnostics.Process.Start(@"http://dcadwiki.dcad.org/dcadwiki/ArcGISPro-CreateAFCRecords");
         }
 
         /// <summary>
@@ -221,7 +224,22 @@ namespace pro_createrecords_addin
             // CreateRecordForSelectedAFCLog();
         }
 
+        #endregion
+
         #region Methods
+
+        #region Help Button Override
+
+        /// <summary>
+        /// Override the default behavior when the dockpane's help icon is clicked
+        /// or the F1 key is pressed.
+        /// </summary>
+        protected override void OnHelpRequested()
+        {
+            System.Diagnostics.Process.Start(@"http://dcadwiki.dcad.org/dcadwiki/ArcGISPro-CreateAFCRecords");
+        }
+
+        #endregion
 
         #region Clear AFC Logs Collections
 
@@ -334,6 +352,15 @@ namespace pro_createrecords_addin
             string _instNum = "INSTRUMENT_NUM";
             string _seqNum = "SEQ_NUM";
             string _afcLogID = "AFC_LOG_ID";
+            int _afcCount = 0;
+            string _whereClause = _blank;
+
+            // Define where clause based
+            // on search string contents
+            if (_searchString != _blank)
+            {
+                _whereClause = String.Format("{0} LIKE '%{1}%' OR {2} LIKE '%{1}%'", _instNum, _searchString, _seqNum);
+            }
 
             // Multi-threaded synchronization
             //private Object _lockObj = new object();
@@ -367,13 +394,21 @@ namespace pro_createrecords_addin
 
                         QueryFilter queryFilter = new QueryFilter
                         {
-                            WhereClause = String.Format("{0} LIKE '%{1}%' OR {2} LIKE '%{1}%'", _instNum, _searchString, _seqNum),
+                            WhereClause = _whereClause,
                             SubFields = "*",
                             PostfixClause = String.Format("ORDER BY {0} ASC", _afcLogID)
                         };
 
                         using (RowCursor rowCursor = table.Search(queryFilter, false))
                         {
+
+
+                            /* ***********************************
+                             * Search through returned rows from *
+                             * query filter and create a new     *
+                             * AFC Log object and bind to the    *
+                             * AFCLogs observable collection.    *
+                             * ***********************************/
                             while (rowCursor.MoveNext())
                             {
                                 using (Row row = rowCursor.Current)
@@ -393,7 +428,7 @@ namespace pro_createrecords_addin
                                     afcLog.ACCOUNT_NUM = Convert.ToString(row["ACCOUNT_NUM"]);
                                     afcLog.SetImageSource();    // Method sets the image source for the afc log type
                                     afcLog.SetDocumentNumber(); // Method sets the document number for the afc log type
-                                    
+                                    _afcCount += 1;             // Increment afc count variable
                                     // Reads and Writes should be made from within the lock
                                     lock (_lockObj)
                                     {
@@ -403,6 +438,9 @@ namespace pro_createrecords_addin
                             }
                         }
                     }
+
+                    // If completed, add psuedo afc log if count is zero
+                    AddEmptyListAFCLog(_afcCount);
                 });
             }
             catch (GeodatabaseFieldException fieldException)
@@ -418,9 +456,48 @@ namespace pro_createrecords_addin
 
 
 
+        #region Add Empty Result List AFC Log
+        /// <summary>
+        /// Adds a psuedo afc log entry to the
+        /// observable collection to send a message
+        /// to the user to assign and afc log.
+        /// </summary>
+        /// <param name="_afcCount"></param>
+        private void AddEmptyListAFCLog(int _afcCount)
+                {
+        
+                    /***********************************************
+                    * DEFAULT BEHAVIOR WHEN NO AFC LOG ASSIGNED   *
+                    * *********************************************
+                    * Displays a default afc log row in the       *
+                    * observable collection. See details in       *
+                    * the AFCLog class.                           *
+                    **********************************************/
+        
+                    if (_afcCount == 0)
+                    {
+                        AFCLog afcLog = new AFCLog();
+                        afcLog.AFC_LOG_ID = 1;
+                        afcLog.AFC_STATUS_CD = 99;
+                        afcLog.SetImageSource();
+                        afcLog.SetDocumentNumber();
+                        lock (_lockObj)
+                        {
+                            _afclogs.Add(afcLog);
+                        }
+                    }
+        
+        
+                }
+        #endregion
+
+
+
         #endregion
 
         #region Delegates
+
+
 
 
         #endregion

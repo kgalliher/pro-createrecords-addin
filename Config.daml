@@ -1,12 +1,6 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
-<ArcGIS defaultAssembly="pro-createrecords-addin.dll"
-        defaultNamespace="pro_createrecords_addin"
-        xmlns="http://schemas.esri.com/DADF/Registry"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
-
+﻿<ArcGIS defaultAssembly="pro-createrecords-addin.dll" defaultNamespace="pro_createrecords_addin" xmlns="http://schemas.esri.com/DADF/Registry" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.esri.com/DADF/Registry file:///C:/Program%20Files/ArcGIS/Pro/bin/ArcGIS.Desktop.Framework.xsd">
   <AddInInfo id="{73c471d3-11e6-40f9-b8f5-ca9b6e9742b4}" version="1.0" desktopVersion="2.8.29751">
-    <Name>pro_createrecords_addin</Name>   
+    <Name>pro_createrecords_addin</Name>
     <Description>ArcGIS Pro Create AFC Records</Description>
     <Image>Images\new_record_32px.png</Image>
     <Author>John W. Fell</Author>
@@ -16,7 +10,6 @@
     <!-- Note subject can be one or more of these topics:
                     Content, Framework, Editing, Geodatabase, Geometry, Geoprocessing, Layouts, Map Authoring, Map Exploration -->
   </AddInInfo>
-
   <modules>
     <insertModule id="pro_createrecords_addin_Module" className="Module1" autoLoad="false" caption="Module1">
       <!-- uncomment to have the control hosted on a separate tab-->
@@ -25,27 +18,25 @@
           <group refID="pro_createrecords_addin_Group1"/>
         </tab>-->
       </tabs>
-              
       <groups>
         <!-- comment this out if you have no controls on the Addin tab to avoid
               an empty group-->
         <group id="pro_createrecords_addin_Group1" caption="Create Records" appearsOnAddInTab="true">
           <!-- host controls within groups -->
-              <button refID="pro_createrecords_addin_CreateRecordsPane_ShowButton" size="large" />
+          <button refID="pro_createrecords_addin_CreateRecordsPane_ShowButton" size="large" />
         </group>
       </groups>
-      
       <controls>
         <!-- add your controls here -->
         <button id="pro_createrecords_addin_CreateRecordsPane_ShowButton" caption="Show Create Records Pane" className="CreateRecordsPane_ShowButton" loadOnClick="true" smallImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/GenericButtonPurple16.png" largeImage="pack://application:,,,/ArcGIS.Desktop.Resources;component/Images/GenericButtonPurple32.png">
           <tooltip heading="Show Create Records Pane">Show Create Records Pane 1.0.0<disabledText /></tooltip>
-        </button>	  
-      </controls> 
+        </button>
+      </controls>
       <dockPanes>
         <dockPane id="pro_createrecords_addin_CreateRecordsPane" hasHelp="true" delayLoadMessage="Loading Create Records Pane" caption="Create Records Pane" className="CreateRecordsPaneViewModel" dock="group" dockWith="esri_core_projectDockPane">
           <content className="CreateRecordsPaneView" />
         </dockPane>
-      </dockPanes>	  
+      </dockPanes>
     </insertModule>
   </modules>
 </ArcGIS>

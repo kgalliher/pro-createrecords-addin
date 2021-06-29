@@ -130,6 +130,7 @@
     <Compile Include="CreateRecordsPaneViewModel.cs" />
     <Compile Include="Module1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RefreshList.cs" />
     <Compile Include="VirtualizingWrapPanel.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -151,6 +152,7 @@
     <Resource Include="Images\create_records_image.png" />
   </ItemGroup>
   <ItemGroup>
+    <Resource Include="Images\no_document_64px.png" />
     <Content Include="SQL\AN_CreateAFCLog_View.sql">
       <SubType>Component</SubType>
     </Content>

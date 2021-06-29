@@ -341,8 +341,12 @@ namespace pro_createrecords_addin
                     _docImage = "Images/split_document_64px.png";
                     break;
 
-                default:                                     // Research
+                case 3:                                     // Research
                     _docImage = "Images/research_document_64px.png";
+                    break;
+
+                default:                                     // Not Provided
+                    _docImage = "Images/no_document_64px.png";
                     break;
             }
         }
@@ -368,6 +372,10 @@ namespace pro_createrecords_addin
 
                 case 3:                                     // Research
                     _docNum = String.Format("{0}-{1}",_afcYear.ToString(), _seqNum);
+                    break;
+
+                default:                                    // Not provided
+                    _docNum = "Assign an AFC log...";
                     break;
             }
         }
