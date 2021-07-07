@@ -82,29 +82,22 @@
  */
 #endregion
 
-using ArcGIS.Core.CIM;
 using ArcGIS.Core.Data;
-using ArcGIS.Core.Geometry;
-using ArcGIS.Desktop.Catalog;
-using ArcGIS.Desktop.Core;
-using ArcGIS.Desktop.Editing;
-using ArcGIS.Desktop.Extensions;
 using ArcGIS.Desktop.Framework;
 using ArcGIS.Desktop.Framework.Contracts;
-using ArcGIS.Desktop.Framework.Dialogs;
 using ArcGIS.Desktop.Framework.Threading.Tasks;
-using ArcGIS.Desktop.Layouts;
-using ArcGIS.Desktop.Mapping;
 using System;
 using System.Collections.Generic;
-using System.Data.Linq;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using ArcGIS.Desktop.Core.Events;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Windows.Data;
+using System.Windows.Input;
+using Microsoft.Toolkit.Mvvm.Input;
+using System.Windows;
+using ArcGIS.Desktop.Mapping;
+using ArcGIS.Desktop.Editing;
 
 namespace pro_createrecords_addin
 {
@@ -125,26 +118,58 @@ namespace pro_createrecords_addin
         private ObservableCollection<AFCLog> _afclogs = new ObservableCollection<AFCLog>();
         private ReadOnlyObservableCollection<AFCLog> _afclogsRO;
         private Object _lockObj = new object();
-        
+
+        /**************************************************************************************************
+         * Public ICommand Implementations for Custom WPF Buttons. This allows the application to call    *
+         * existing methods in the ViewModel from the button using AsyncRelayCommand.                     *
+         * (1) RefreshList - Refreshes the afc log list                                                   *
+         * (2) CreateCleanupRecord - Creates a new parcel fabric records of the cleanup type. This is     *
+         *     a custom record with specific attributes applied automatically when the workflow involves  *
+         *     cleaning up GIS data only and no legal document is triggering a parcel change.             *
+         *     
+         *************************************************************************************************/
+        public ICommand RefreshListCommand { get; set; }
+        public ICommand CreateCleanupRecordCommand { get; set; }
 
 
         #endregion
 
-        protected CreateRecordsPaneViewModel() 
+        public CreateRecordsPaneViewModel() 
         {
             //TODO: Check to ensure that a parcel fabric is
             // included in the current map and that the AFC Log View exists
             // in the geodatabase
+
+            /******************************************************************
+             * ReadOnlyObservableCollection for AFC Logs binding:
+             * This variable is assigned a new ReadOnlyObservableCollection
+             * bound to the public ObservableCollection object _afclogs.
+             * The _afclogs variable is a collection of AFCLog objects and 
+             * is manipulated based on the contents of the ADM.AFC_LOG_VW
+             * database view. To update the list of AFC logs in the
+             * wrap panel properly, a lock object must be used to add
+             * items to the _afclogs list. However, the AFC logs list only
+             * updates as changes occur to the database view when bound to
+             * a ReadOnlyObservableCollection, hence this approach is used.
+             ******************************************************************/ 
 
             _afclogsRO = new ReadOnlyObservableCollection<AFCLog>(_afclogs);
             BindingOperations.EnableCollectionSynchronization(_afclogsRO, _lockObj);
 
 
             // Call SearchForAFCLogs
-            SearchForAFCLogs();
+            AsyncSearchForAFCLogs();
 
-            // Update control
-            //NotifyPropertyChanged("AFCLogs");
+            /*******************************************************************************
+             * Hook RefreshList and CreateCleanupRecord commands                           *
+             * The AsyncRelayCommand is part of the Microsoft.Toolkit.Mvvm.Input namespace *
+             * and allows developers to pass class methods to ICommand implementations to  *
+             * be called from custom button controls on the xaml UI.                       *
+             * *****************************************************************************/
+
+            RefreshListCommand = new AsyncRelayCommand( func => AsyncSearchForAFCLogs());
+            //CreateCleanupRecord = new AsyncRelayCommand(func => AsyncCreateCleanupRecord());
+
 
         }
 
@@ -205,7 +230,7 @@ namespace pro_createrecords_addin
                 SetProperty(ref _searchString, value, () => SearchString);
 
                 //Call SearchForAFCLogs
-                SearchForAFCLogs(_searchString);
+                AsyncSearchForAFCLogs(_searchString);
 
 
             }
@@ -260,7 +285,7 @@ namespace pro_createrecords_addin
         /// <summary>
         /// Update the list of AFC Logs given the current search text.
         /// </summary>
-        public async Task SearchForAFCLogs(string _searchString = _blank)
+        public async Task AsyncSearchForAFCLogs(string _searchString = _blank)
         {
             if (AFCLogs.Count > 0)
             {
@@ -409,7 +434,7 @@ namespace pro_createrecords_addin
                              * AFC Log object and bind to the    *
                              * AFCLogs observable collection.    *
                              * ***********************************/
-                            while (rowCursor.MoveNext())
+            while (rowCursor.MoveNext())
                             {
                                 using (Row row = rowCursor.Current)
                                 {
@@ -492,6 +517,66 @@ namespace pro_createrecords_addin
         #endregion
 
 
+
+        #endregion
+
+        #region Parcel Fabric Methods
+
+        #region Create a New Record
+            
+            public async Task AsyncCreateNewRecord(string _name, int _recordType, int _afcType, DateTime _recordedDate, DateTime _effectiveDate, int _recordStatus)
+            {
+
+                // TODO: Pass in record name, record type, afctype, 
+                // recorded date, effective date, and record status
+
+                string errorMessage = await QueuedTask.Run(async () =>
+                {
+                    Dictionary<string, object> RecordAttributes = new Dictionary<string, object>();
+                    string sNewRecord = _name;
+                    try
+                    {
+                        var myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
+                        //if there is no fabric in the map then bail
+                        if (myParcelFabricLayer == null)
+                            return "There is no fabric in the map.";
+                        var recordsLayer = await myParcelFabricLayer.GetRecordsLayerAsync();
+                        var editOper = new EditOperation()
+                        {
+                            Name = "Create Parcel Fabric Record",
+                            ProgressMessage = "Create Parcel Fabric Record...",
+                            ShowModalMessageAfterFailure = true,
+                            SelectNewFeatures = false,
+                            SelectModifiedFeatures = false
+                        };
+                        RecordAttributes.Add("Name", sNewRecord);
+                        // TODO: Include additional record attributes here
+                        // RecordAttributes.Add("Attribute01", sAttribute01);
+                        // RecordAttributes.Add("Attribute02", sAttribute02)
+                        // Etc...
+
+                        var editRowToken = editOper.CreateEx(recordsLayer.FirstOrDefault(), RecordAttributes);
+                        if (!editOper.Execute())
+                            return editOper.ErrorMessage;
+                
+                        var defOID = -1;
+                        var lOid = editRowToken.ObjectID.HasValue ? editRowToken.ObjectID.Value : defOID;
+                        await myParcelFabricLayer.SetActiveRecordAsync(lOid);
+                    }
+                    catch (Exception ex)
+                    {
+                        return ex.Message;
+                    }
+                    return "";
+                });
+                if (!string.IsNullOrEmpty(errorMessage))
+                    MessageBox.Show(errorMessage, "Create New Record.");
+
+        }
+                
+
+
+        #endregion
 
         #endregion
 
