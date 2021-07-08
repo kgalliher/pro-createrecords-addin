@@ -94,6 +94,7 @@ namespace pro_createrecords_addin
         private const string NOT_COMPLETED_DATE = "1900-01-01 00:00:00.000";
         private const char BACK_SLASH = '\\';
         private const string BLANK = "";
+        private const string NO_ACCT_NUM = "NO ACCOUNT NUMBER";
 
         #region Deed Types
         /* DEED TYPES *****************************************************/
@@ -179,7 +180,7 @@ namespace pro_createrecords_addin
             _specCompDt = DateTime.Now;
             _specialistID = BLANK;
             _instrumentNum = BLANK;
-            _accountNum = BLANK;
+            _accountNum = NO_ACCT_NUM;
             _acctList = BLANK;
             _tileNo = 0;
             _seqNum = BLANK;

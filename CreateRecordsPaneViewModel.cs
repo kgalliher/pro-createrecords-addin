@@ -122,13 +122,14 @@ namespace pro_createrecords_addin
         /**************************************************************************************************
          * Public ICommand Implementations for Custom WPF Buttons. This allows the application to call    *
          * existing methods in the ViewModel from the button using AsyncRelayCommand.                     *
-         * (1) RefreshList - Refreshes the afc log list                                                   *
-         * (2) CreateCleanupRecord - Creates a new parcel fabric records of the cleanup type. This is     *
-         *     a custom record with specific attributes applied automatically when the workflow involves  *
-         *     cleaning up GIS data only and no legal document is triggering a parcel change.             *
-         *     
+         * (1) RefreshListCommand - Refreshes the afc log list.                                           *
+         * (2) CreateRecordCommand - Creates a new record based on selected AFC Log information.          *
+         * (3) CreateCleanupRecordCommand - Creates a new parcel fabric records of the cleanup type.      *
+         *     This is a custom record with specific attributes applied automatically when the workflow   *
+         *     involves  cleaning up GIS data only and no legal document is triggering a parcel change.   *
          *************************************************************************************************/
         public ICommand RefreshListCommand { get; set; }
+        public ICommand CreateRecordCommand { get; set; }
         public ICommand CreateCleanupRecordCommand { get; set; }
 
 
@@ -159,6 +160,7 @@ namespace pro_createrecords_addin
 
             // Call SearchForAFCLogs
             AsyncSearchForAFCLogs();
+            //DisplayTestMessage();
 
             /*******************************************************************************
              * Hook RefreshList and CreateCleanupRecord commands                           *
@@ -168,6 +170,7 @@ namespace pro_createrecords_addin
              * *****************************************************************************/
 
             RefreshListCommand = new AsyncRelayCommand( func => AsyncSearchForAFCLogs());
+            CreateRecordCommand = new AsyncRelayCommand( func => AsyncDisplayTestMessage());
             //CreateCleanupRecord = new AsyncRelayCommand(func => AsyncCreateCleanupRecord());
 
 
@@ -379,6 +382,7 @@ namespace pro_createrecords_addin
             string _afcLogID = "AFC_LOG_ID";
             int _afcCount = 0;
             string _whereClause = _blank;
+            bool _acctNumBlank = false;
 
             // Define where clause based
             // on search string contents
@@ -439,11 +443,16 @@ namespace pro_createrecords_addin
                                 using (Row row = rowCursor.Current)
                                 {
                                     AFCLog afcLog = new AFCLog();
+
+                                    // Determine AFC NOTE length and truncate if longer than 35 chars
+                                    int _afcNoteLength = Convert.ToString(row["AFC_NOTE"]).Length;
+                                    if (_afcNoteLength > 35) _afcNoteLength = 35;
+
                                     afcLog.AFC_LOG_ID = Convert.ToInt32(row["AFC_LOG_ID"]);
                                     afcLog.AFC_STATUS_CD = Convert.ToInt32(row["AFC_STATUS_CD"]);
                                     afcLog.AFC_TYPE_CD = Convert.ToInt32(row["AFC_TYPE_CD"]);
                                     afcLog.AFC_YEAR = Convert.ToInt32(row["AFC_YEAR"]);
-                                    afcLog.AFC_NOTE = Convert.ToString(row["AFC_NOTE"]);
+                                    afcLog.AFC_NOTE = Convert.ToString(row["AFC_NOTE"]).Substring(0, _afcNoteLength);
                                     afcLog.TILE_NO = Convert.ToInt32(row["TILE_NO"]);
                                     afcLog.DRAFTER_EMPL_ID = Convert.ToString(row["DRAFTER_EMPL_ID"]);
                                     afcLog.DRAFTER_COMP_DT = Convert.ToDateTime(row["DRAFTER_COMP_DT"]);
@@ -452,8 +461,12 @@ namespace pro_createrecords_addin
                                     afcLog.INSTRUMENT_NUM = Convert.ToString(row["INSTRUMENT_NUM"]);
                                     afcLog.SEQ_NUM = Convert.ToString(row["SEQ_NUM"]);
                                     afcLog.RUSH_IND = Convert.ToString(row["RUSH_IND"]) == _yes ? true : false;
-                                    afcLog.ACCOUNT_NUM = Convert.ToString(row["ACCOUNT_NUM"]);
-                                    afcLog.ACCT_LIST = Convert.ToString(row["ACCT_LIST"]);
+
+                                    // Determine if Account Number is provided
+                                    if (Convert.ToString(row["ACCOUNT_NUM"]).Equals(_blank)) _acctNumBlank = true;
+                                    if (!_acctNumBlank) afcLog.ACCOUNT_NUM = Convert.ToString(row["ACCOUNT_NUM"]);
+
+                                    //afcLog.ACCT_LIST = Convert.ToString(row["ACCT_LIST"]);
                                     afcLog.DOC_TYPE = Convert.ToString(row["DOC_TYPE"]);
                                     afcLog.SetImageSource();    // Method sets the image source for the afc log type
                                     afcLog.SetDocumentNumber(); // Method sets the document number for the afc log type
@@ -599,10 +612,20 @@ namespace pro_createrecords_addin
                     MessageBox.Show(errorMessage, "Create New Record.");
 
         }
-                
+
 
 
         #endregion
+
+        #region Display Test Message
+
+            public async Task AsyncDisplayTestMessage()
+        {
+            MessageBox.Show(String.Format("User: {0} clicked the image!", AFCLog.GetCurrentUser()));
+        }
+
+        #endregion
+
 
         #endregion
 
