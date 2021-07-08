@@ -95,6 +95,35 @@ namespace pro_createrecords_addin
         private const char BACK_SLASH = '\\';
         private const string BLANK = "";
 
+        #region Deed Types
+        /* DEED TYPES *****************************************************/
+        private const string AOH = "AFFIDAVIT OF HEIRSHIP";
+        private const string AMD = "AMENDMENT TO DECLARATION OF CONDOMINUM";
+        private const string ALD = "ASSESSMENT LIEN DEED";
+        private const string BOS = "BILL OF SALE";
+        private const string COD = "CONDOMINIUM DECLARATION";
+        private const string CND = "CONSTABLE DEED";
+        private const string CFD = "CONTRACT FOR DEED";
+        private const string COS = "CONTRACT OF SALE";
+        private const string CON = "CONVEYANCE";
+        private const string DCA = "DEDICATION";
+        private const string DED = "DEED";
+        private const string EAS = "EASEMENT";
+        private const string GWD = "GENERAL WARRANTY DEED";
+        private const string GFT = "GIFT DEED";
+        private const string JDG = "JUDGEMENT";
+        private const string ORD = "ORDINANCE";
+        private const string PLT = "PLAT";
+        private const string QCD = "QUIT CLAIM DEED";
+        private const string ROW = "RIGHT OF WAY";
+        private const string RWD = "RIGHT OF WAY DEED";
+        private const string SHD = "SHERRIF'S DEED";
+        private const string TRM = "TERMINATION";
+        private const string TRD = "TRUSTEE DEED";
+        private const string TRS = "TRUSTEE'S/SUBSTITUTE TRUSTEE'S DEED";
+        private const string WAD = "WARRANTY DEED";
+        private const string WD2 = "WD (AKA WARRANTY DEED)";
+        #endregion
 
         #endregion
 
@@ -112,16 +141,21 @@ namespace pro_createrecords_addin
                                           //                  3-Pending, 4-Cert-Hold, 
                                           //                  5-Deleted, 6-Quality Control, or
                                           //                  7-Corrections)
-        private DateTime _effectiveDt;    // Effective Date of Instrument
+        private string _afcNote;          // User defined AFC description
+        private DateTime _fileDt;         // Recorded or filed date of the instrument
+        private DateTime _effectiveDt;    // Effective date of the instrument
         private DateTime _specCompDt;     // Completion date of AFC Log AKA DRAFTER_COMP_DT
         private string _specialistID;     // AKA DRAFTER_EMPL_ID in AFC_LOG table or Specialist User ID
         private string _instrumentNum;    // Instrument Number (e.g., 202100012345)
         private string _accountNum;       // The parent account number
+        private string _acctList;         // List of additional parent account numbers
         private int _tileNo;              // Tile Number (e.g., 174)
         private string _seqNum;           // Sequence Number (e.g., 0520-01)
         private bool _rush;               // Indicates if the AFC Log is critical
         private string _docImage;         // Image to symbol image for AFC log type
         private string _docNum;           // Instrument number or sequence number depending on the AFC Type
+        private string _docType;          // Description of the deed type from DEED_MAIN table
+        private int _recordType;          // Variable that holds the record type based on the doc type
 
 
         #endregion
@@ -139,15 +173,21 @@ namespace pro_createrecords_addin
             _afcLogID = 0;
             _afcTypeCd = 0;
             _afcStatusCd = 0;
+            _afcNote = BLANK;
+            _fileDt = DateTime.Now;
             _effectiveDt = DateTime.Now;
             _specCompDt = DateTime.Now;
             _specialistID = BLANK;
             _instrumentNum = BLANK;
+            _accountNum = BLANK;
+            _acctList = BLANK;
             _tileNo = 0;
             _seqNum = BLANK;
             _rush = false;
             _docImage = BLANK;
             _docNum = BLANK;
+            _docType = BLANK;
+            _recordType = 0;
 
             #endregion
 
@@ -158,7 +198,6 @@ namespace pro_createrecords_addin
         /// <summary>
         /// AFC Log Id that uniquely identifies the AFC log
         /// </summary>
-        [Column(IsPrimaryKey=true, Storage="_afcLogId")]
         public int AFC_LOG_ID
         {
 
@@ -170,7 +209,6 @@ namespace pro_createrecords_addin
         /// <summary>
         /// Year the AFC log was created
         /// </summary>
-        [Column(Storage ="_afcYear")]
         public int AFC_YEAR
         {
             get { return _afcYear; }
@@ -180,7 +218,6 @@ namespace pro_createrecords_addin
         /// <summary>
         /// The parent account number
         /// </summary>
-        [Column(Storage ="_accountNum")]
         public string ACCOUNT_NUM
         {
             get { return _accountNum; }
@@ -191,7 +228,6 @@ namespace pro_createrecords_addin
         /// <summary>
         /// AFC Type determines if an AFC is Addition, Split, or Research.
         /// </summary>
-        [Column(Storage ="_afcTypeCd")]
         public int AFC_TYPE_CD
         {
             get { return _afcTypeCd; }
@@ -202,7 +238,6 @@ namespace pro_createrecords_addin
         /// AFC Status code describing the state of the log.
         /// May be Active, Completed, Pending, Cert-Hold, Deleted, Quality Control, or Corrections.
         /// </summary>
-        [Column(Storage = "_afcStatusCd")]
         public int AFC_STATUS_CD
         {
             get { return _afcStatusCd; }
@@ -210,9 +245,27 @@ namespace pro_createrecords_addin
         }
 
         /// <summary>
+        /// AFC Note is a general description
+        /// of the AFC log.
+        /// </summary>
+        public string AFC_NOTE
+        {
+            get { return _afcNote; }
+            set { _afcNote = value; }
+        }
+
+        /// <summary>
+        /// File date of the instrument.
+        /// </summary>
+        public DateTime FILE_DATE
+        {
+            get { return _fileDt; }
+            set { _fileDt = value; }
+        }
+
+        /// <summary>
         /// Date when the recorded document becomes effective.
         /// </summary>
-        [Column(Storage = "_effectiveDt")]
         public DateTime EFFECTIVE_DT
         {
             get { return _effectiveDt; }
@@ -223,7 +276,6 @@ namespace pro_createrecords_addin
         /// Date when the specialist completed the AFC log.
         /// AKA DRAFTER_COMP_DT in AFC_LOG table.
         /// </summary>
-        [Column(Storage = "_specCompDt")]
         public DateTime DRAFTER_COMP_DT
         {
             get { return _specCompDt; }
@@ -233,7 +285,6 @@ namespace pro_createrecords_addin
         /// <summary>
         /// Specialist ID or username.
         /// </summary>
-        [Column(Storage = "_specialistID")]
         public string DRAFTER_EMPL_ID
         {
             get { return _specialistID; }
@@ -244,7 +295,6 @@ namespace pro_createrecords_addin
         /// <summary>
         /// The document or instrument number included in the log.
         /// </summary>
-        [Column(Storage = "_instrumentNum")]
         public string INSTRUMENT_NUM
         {
             get { return _instrumentNum; }
@@ -254,7 +304,6 @@ namespace pro_createrecords_addin
         /// <summary>
         /// Tile number where parent account is located.
         /// </summary>
-        [Column(Storage = "_tileNo")]
         public int TILE_NO
         {
             get { return _tileNo; }
@@ -265,7 +314,6 @@ namespace pro_createrecords_addin
         /// <summary>
         /// AFC Log sequence number for Research Form types
         /// </summary>
-        [Column(Storage = "_seqNum")]
         public string SEQ_NUM
         {
             get { return _seqNum; }
@@ -277,12 +325,25 @@ namespace pro_createrecords_addin
         /// Indicates if the AFC log is critical 
         /// and should be processed immediately
         /// </summary>
-        [Column(Storage = "_rush")]
         public bool RUSH_IND
         {
             get { return _rush; }
             set { _rush = value; }
         }
+
+
+        /// <summary>
+        /// String list of additional parent 
+        /// account numbers.
+        /// </summary>
+        public string ACCT_LIST
+        {
+            get { return _acctList; }
+            set { _acctList = value; }
+        }
+
+
+
 
         /// <summary>
         /// The path for the document image
@@ -305,6 +366,33 @@ namespace pro_createrecords_addin
             set { _docNum = value; }
         }
 
+        /// <summary>
+        /// The type of deed. This
+        /// will help to define 
+        /// the record type.
+        /// </summary>
+        public string DOC_TYPE
+        {
+            get { return _docType; }
+            set { _docType = value; }
+        }
+
+        /// <summary>
+        /// Stores the integer value
+        /// of the record type. Based
+        /// on DOC_TYPE property and
+        /// represents the coded value
+        /// for the RecordType domain
+        /// in the Records feature class.
+        /// </summary>
+        public int RECORD_TYPE
+        {
+            get { return _recordType; }
+            set { _recordType = value; }
+        }
+
+
+
         #endregion
 
         #region Methods
@@ -325,29 +413,39 @@ namespace pro_createrecords_addin
 
         /// <summary>
         /// Determines the document image
-        /// based on the type of AFC
+        /// based on the type and status of 
+        /// AFC
         /// </summary>
         public void SetImageSource()
         {
 
-            switch (_afcTypeCd)
+            /* First check to see if the AFC Status is Active */
+
+            if (_afcStatusCd == 1)
             {
-                case 1:                                     // Addition
-                    _docImage = "Images/addition_document_64px.png";
-                    break;
+                switch (_afcTypeCd)
+                {
+                    case 1:                                     // Addition
+                        _docImage = "Images/addition_document_64px.png";
+                        break;
 
 
-                case 2:                                     // Split
-                    _docImage = "Images/split_document_64px.png";
-                    break;
+                    case 2:                                     // Split
+                        _docImage = "Images/split_document_64px.png";
+                        break;
 
-                case 3:                                     // Research
-                    _docImage = "Images/research_document_64px.png";
-                    break;
+                    case 3:                                     // Research
+                        _docImage = "Images/research_document_64px.png";
+                        break;
 
-                default:                                     // Not Provided
-                    _docImage = "Images/no_document_64px.png";
-                    break;
+                    default:                                     // Not Provided
+                        _docImage = "Images/no_document_64px.png";
+                        break;
+                }
+            }
+            else /* If not, then the AFC status is Cert-Hold */
+            {
+                _docImage = "Images/no_document_64px.png";       // Cert Hold
             }
         }
 
@@ -376,6 +474,123 @@ namespace pro_createrecords_addin
 
                 default:                                    // Not provided
                     _docNum = "Assign an AFC log...";
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Sets the record type based 
+        /// on the document type.
+        /// </summary>
+        public void SetRecordType()
+        {
+            switch (_docType)
+            {
+                case AOH:
+                    _recordType = 1;
+                    break;
+
+                case AMD:
+                    _recordType = 2;
+                    break;
+
+                case ALD:
+                    _recordType = 3;
+                    break;
+
+                case BOS:
+                    _recordType = 4;
+                    break;
+
+                case COD:
+                    _recordType = 5;
+                    break;
+
+                case CND:
+                    _recordType = 6;
+                    break;
+
+                case CFD:
+                    _recordType = 7;
+                    break;
+
+                case COS:
+                    _recordType = 8;
+                    break;
+
+                case CON:
+                    _recordType = 9;
+                    break;
+
+                case DCA:
+                    _recordType = 10;
+                    break;
+
+                case DED:
+                    _recordType = 11;
+                    break;
+
+                case EAS:
+                    _recordType = 12;
+                    break;
+
+                case GWD:
+                    _recordType = 13;
+                    break;
+
+                case GFT:
+                    _recordType = 14;
+                    break;
+
+                case JDG:
+                    _recordType = 15;
+                    break;
+
+                case ORD:
+                    _recordType = 16;
+                    break;
+
+                case PLT:
+                    _recordType = 17;
+                    break;
+
+                case QCD:
+                    _recordType = 18;
+                    break;
+
+                case ROW:
+                    _recordType = 19;
+                    break;
+
+                case RWD:
+                    _recordType = 20;
+                    break;
+
+                case SHD:
+                    _recordType = 21;
+                    break;
+
+                case TRM:
+                    _recordType = 22;
+                    break;
+
+                case TRD:
+                    _recordType = 23;
+                    break;
+
+                case TRS:
+                    _recordType = 24;
+                    break;
+
+                case WAD:
+                    _recordType = 25;
+                    break;
+
+                case WD2:
+                    _recordType = 26;
+                    break;
+
+                default:
                     break;
             }
         }

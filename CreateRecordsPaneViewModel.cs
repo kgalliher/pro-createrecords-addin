@@ -108,7 +108,7 @@ namespace pro_createrecords_addin
         #region Constants
 
         private const string _dockPaneID  = "pro_createrecords_addin_CreateRecordsPane";
-        private const string _instance = "DCADSQLDV";
+        private const string _instance = "DCADSQLVM02";
         private const string _database = "GEDT";
         private const AuthenticationMode _authentication = AuthenticationMode.OSA;
         private const string _version = "dbo.DEFAULT";
@@ -443,16 +443,21 @@ namespace pro_createrecords_addin
                                     afcLog.AFC_STATUS_CD = Convert.ToInt32(row["AFC_STATUS_CD"]);
                                     afcLog.AFC_TYPE_CD = Convert.ToInt32(row["AFC_TYPE_CD"]);
                                     afcLog.AFC_YEAR = Convert.ToInt32(row["AFC_YEAR"]);
+                                    afcLog.AFC_NOTE = Convert.ToString(row["AFC_NOTE"]);
                                     afcLog.TILE_NO = Convert.ToInt32(row["TILE_NO"]);
                                     afcLog.DRAFTER_EMPL_ID = Convert.ToString(row["DRAFTER_EMPL_ID"]);
                                     afcLog.DRAFTER_COMP_DT = Convert.ToDateTime(row["DRAFTER_COMP_DT"]);
+                                    afcLog.FILE_DATE = Convert.ToDateTime(row["FILE_DATE"]);
                                     afcLog.EFFECTIVE_DT = Convert.ToDateTime(row["EFFECTIVE_DT"]);
                                     afcLog.INSTRUMENT_NUM = Convert.ToString(row["INSTRUMENT_NUM"]);
                                     afcLog.SEQ_NUM = Convert.ToString(row["SEQ_NUM"]);
                                     afcLog.RUSH_IND = Convert.ToString(row["RUSH_IND"]) == _yes ? true : false;
                                     afcLog.ACCOUNT_NUM = Convert.ToString(row["ACCOUNT_NUM"]);
+                                    afcLog.ACCT_LIST = Convert.ToString(row["ACCT_LIST"]);
+                                    afcLog.DOC_TYPE = Convert.ToString(row["DOC_TYPE"]);
                                     afcLog.SetImageSource();    // Method sets the image source for the afc log type
                                     afcLog.SetDocumentNumber(); // Method sets the document number for the afc log type
+                                    afcLog.SetRecordType();     // Method sets the record type for the afc log
                                     _afcCount += 1;             // Increment afc count variable
                                     // Reads and Writes should be made from within the lock
                                     lock (_lockObj)
@@ -470,8 +475,10 @@ namespace pro_createrecords_addin
             }
             catch (GeodatabaseFieldException fieldException)
             {
-                // One of the fields in the where clause might not exist. There are multiple ways this can be handled:
+                // One of the fields in the where clause might not exist. 
+                // There are multiple ways this can be handled:
                 // Handle error appropriately
+                ErrorLogs.WriteLogEntry("Create Records Add-In", fieldException.Message, System.Diagnostics.EventLogEntryType.Error);
             }
             catch (Exception exception)
             {
@@ -524,6 +531,20 @@ namespace pro_createrecords_addin
 
         #region Create a New Record
             
+            /// <summary>
+            /// This asynchronous method creates
+            /// a new record within the parcel fabric
+            /// found in the active map. If a parcel
+            /// fabric is not found it will display
+            /// a message indicating the problem.
+            /// </summary>
+            /// <param name="_name"></param>
+            /// <param name="_recordType"></param>
+            /// <param name="_afcType"></param>
+            /// <param name="_recordedDate"></param>
+            /// <param name="_effectiveDate"></param>
+            /// <param name="_recordStatus"></param>
+            /// <returns></returns>
             public async Task AsyncCreateNewRecord(string _name, int _recordType, int _afcType, DateTime _recordedDate, DateTime _effectiveDate, int _recordStatus)
             {
 
@@ -533,7 +554,8 @@ namespace pro_createrecords_addin
                 string errorMessage = await QueuedTask.Run(async () =>
                 {
                     Dictionary<string, object> RecordAttributes = new Dictionary<string, object>();
-                    string sNewRecord = _name;
+                    // TODO REMOVE: string sNewRecord = _name;
+
                     try
                     {
                         var myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
@@ -549,7 +571,11 @@ namespace pro_createrecords_addin
                             SelectNewFeatures = false,
                             SelectModifiedFeatures = false
                         };
-                        RecordAttributes.Add("Name", sNewRecord);
+                        RecordAttributes.Add("Name", _name);
+                        RecordAttributes.Add("RecordType", _recordType);
+                        RecordAttributes.Add("RecordedDate", _recordedDate);
+                        RecordAttributes.Add("EffectiveDate", _effectiveDate);
+                        RecordAttributes.Add("AFCType", _afcType);
                         // TODO: Include additional record attributes here
                         // RecordAttributes.Add("Attribute01", sAttribute01);
                         // RecordAttributes.Add("Attribute02", sAttribute02)
