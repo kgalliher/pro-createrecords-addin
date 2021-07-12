@@ -71,6 +71,10 @@
 #endregion
 
 
+using ArcGIS.Desktop.Editing;
+using ArcGIS.Desktop.Framework.Threading.Tasks;
+using ArcGIS.Desktop.Mapping;
+using Microsoft.Toolkit.Mvvm.Input;
 using System;
 using System.Collections.Generic;
 using System.Data.Linq;
@@ -78,7 +82,9 @@ using System.Data.Linq.Mapping;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 
 namespace pro_createrecords_addin
@@ -157,6 +163,7 @@ namespace pro_createrecords_addin
         private string _docNum;           // Instrument number or sequence number depending on the AFC Type
         private string _docType;          // Description of the deed type from DEED_MAIN table
         private int _recordType;          // Variable that holds the record type based on the doc type
+        private int _recordStatus;        // Determines if the record's parcels should be published.
 
 
         #endregion
@@ -189,12 +196,42 @@ namespace pro_createrecords_addin
             _docNum = BLANK;
             _docType = BLANK;
             _recordType = 0;
+            _recordStatus = 0;
+
+             /******************************************************************************
+             * Hook CreateRecord commands                                                  *
+             * The AsyncRelayCommand is part of the Microsoft.Toolkit.Mvvm.Input namespace *
+             * and allows developers to pass class methods to ICommand implementations to  *
+             * be called from custom button controls on the xaml UI.                       *
+             * ****************************************************************************/
+
+            CreateRecordCommand = new AsyncRelayCommand(func => AsyncCreateNewRecord());
 
             #endregion
 
         }
 
         #region Properties
+
+        /// <summary>
+        /// Represents a wrapper
+        /// for the create record
+        /// command.
+        /// </summary>
+        public ICommand CreateRecordCommand { get; set; }
+
+
+        /// <summary>
+        /// Boolean property stating
+        /// if a record has been created
+        /// for the AFC LOG.
+        /// </summary>
+        public bool RECORD_CREATED
+        {
+            get { return _recordCreated; }
+            set { _recordCreated = value; }
+        }
+
 
         /// <summary>
         /// AFC Log Id that uniquely identifies the AFC log
@@ -393,208 +430,398 @@ namespace pro_createrecords_addin
         }
 
 
+        /// <summary>
+        /// Determines whether the Record's 
+        /// parcel's should be published.
+        /// 0 - Publish
+        /// 1 - Publish after certification
+        /// 2 - Pending
+        /// </summary>
+        public int RECORD_STATUS
+        {
+            get { return _recordStatus; }
+            set { _recordStatus = value; }
+        }
+
+
+
 
         #endregion
 
         #region Methods
-        /// <summary>
-        /// Identifies the authenticated user.
-        /// </summary>
-        /// <returns>The string containing the user name without the domain.</returns>
-        public static string GetCurrentUser()
-        {
-            // Get the logged in user
-            #pragma warning disable CA1416 // Disable platform compatibility
-            string authenticatedUser = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
-            #pragma warning restore CA1416 // Re-enable platform compatibility
 
-            return authenticatedUser.Split(BACK_SLASH)[1];
 
-        }
-
-        /// <summary>
-        /// Determines the document image
-        /// based on the type and status of 
-        /// AFC
-        /// </summary>
-        public void SetImageSource()
-        {
-
-            /* First check to see if the AFC Status is Active */
-
-            if (_afcStatusCd == 1)
+        #region Get Current User
+            /// <summary>
+            /// Identifies the authenticated user.
+            /// </summary>
+            /// <returns>The string containing the user name without the domain.</returns>
+            public static string GetCurrentUser()
             {
+                // Get the logged in user
+                #pragma warning disable CA1416 // Disable platform compatibility
+                string authenticatedUser = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                #pragma warning restore CA1416 // Re-enable platform compatibility
+            
+                return authenticatedUser.Split(BACK_SLASH)[1];
+            
+            }
+        #endregion
+
+        #region Set Image Source
+            /// <summary>
+            /// Determines the document image
+            /// based on the type and status of 
+            /// AFC
+            /// </summary>
+            public void SetImageSource()
+            {
+            
+                /* First check to see if the AFC Status is Active */
+            
+                if (_afcStatusCd == 1)
+                {
+                    switch (_afcTypeCd)
+                    {
+                        case 1:                                     // Addition
+                            _docImage = "Images/addition_document_64px.png";
+                            break;
+            
+            
+                        case 2:                                     // Split
+                            _docImage = "Images/split_document_64px.png";
+                            break;
+            
+                        case 3:                                     // Research
+                            _docImage = "Images/research_document_64px.png";
+                            break;
+            
+                        default:                                     // Not Provided
+                            _docImage = "Images/no_document_64px.png";
+                            break;
+                    }
+                }
+                else /* If not, then the AFC status is Cert-Hold */
+                {
+                    _docImage = "Images/no_document_64px.png";       // Cert Hold
+                }
+            }
+        #endregion
+
+        #region Set Document Number
+            /// <summary>
+            /// Determines the document number
+            /// based on the type of AFC
+            /// </summary>
+            public void SetDocumentNumber()
+            {
+            
                 switch (_afcTypeCd)
                 {
                     case 1:                                     // Addition
-                        _docImage = "Images/addition_document_64px.png";
+                        _docNum = _instrumentNum;
                         break;
-
-
+            
+            
                     case 2:                                     // Split
-                        _docImage = "Images/split_document_64px.png";
+                        _docNum = _instrumentNum;
                         break;
-
+            
                     case 3:                                     // Research
-                        _docImage = "Images/research_document_64px.png";
+                        _docNum = String.Format("{0}-{1}",_afcYear.ToString(), _seqNum);
                         break;
-
-                    default:                                     // Not Provided
-                        _docImage = "Images/no_document_64px.png";
+            
+                    default:                                    // Not provided
+                        _docNum = "Assign an AFC log...";
                         break;
                 }
             }
-            else /* If not, then the AFC status is Cert-Hold */
-            {
-                _docImage = "Images/no_document_64px.png";       // Cert Hold
-            }
-        }
+        #endregion
 
+        #region Set Record Type
+            /// <summary>
+            /// Sets the record type based 
+            /// on the document type.
+            /// </summary>
+            public void SetRecordType()
+            {
+                switch (_docType)
+                {
+                    case AOH:
+                        _recordType = 1;
+                        break;
+            
+                    case AMD:
+                        _recordType = 2;
+                        break;
+            
+                    case ALD:
+                        _recordType = 3;
+                        break;
+            
+                    case BOS:
+                        _recordType = 4;
+                        break;
+            
+                    case COD:
+                        _recordType = 5;
+                        break;
+            
+                    case CND:
+                        _recordType = 6;
+                        break;
+            
+                    case CFD:
+                        _recordType = 7;
+                        break;
+            
+                    case COS:
+                        _recordType = 8;
+                        break;
+            
+                    case CON:
+                        _recordType = 9;
+                        break;
+            
+                    case DCA:
+                        _recordType = 10;
+                        break;
+            
+                    case DED:
+                        _recordType = 11;
+                        break;
+            
+                    case EAS:
+                        _recordType = 12;
+                        break;
+            
+                    case GWD:
+                        _recordType = 13;
+                        break;
+            
+                    case GFT:
+                        _recordType = 14;
+                        break;
+            
+                    case JDG:
+                        _recordType = 15;
+                        break;
+            
+                    case ORD:
+                        _recordType = 16;
+                        break;
+            
+                    case PLT:
+                        _recordType = 17;
+                        break;
+            
+                    case QCD:
+                        _recordType = 18;
+                        break;
+            
+                    case ROW:
+                        _recordType = 19;
+                        break;
+            
+                    case RWD:
+                        _recordType = 20;
+                        break;
+            
+                    case SHD:
+                        _recordType = 21;
+                        break;
+            
+                    case TRM:
+                        _recordType = 22;
+                        break;
+            
+                    case TRD:
+                        _recordType = 23;
+                        break;
+            
+                    case TRS:
+                        _recordType = 24;
+                        break;
+            
+                    case WAD:
+                        _recordType = 25;
+                        break;
+            
+                    case WD2:
+                        _recordType = 26;
+                        break;
+            
+                    default:
+                        break;
+                }
+            }
+        #endregion
+
+        #region Set Record Status
+
+            /// <summary>
+            /// Applies a publish record status if
+            /// the AFC Log is not marked as cert hold,
+            /// otherwise, set the record status to 
+            /// publish after certification.
+            /// </summary>
+            public void SetRecordStatus()
+            {
+                switch (_afcStatusCd)
+                {
+                    case 4:                            // Cert Hold
+                        _recordStatus = 1;
+                        break;
+                    default:                          // Not Cert Hold
+                        _recordStatus = 0;
+                        break;
+                }
+            }
+        #endregion
+
+        #region Parcel Fabric Methods
+
+        #region Create a New Record
 
         /// <summary>
-        /// Determines the document number
-        /// based on the type of AFC
+        /// This asynchronous method creates
+        /// a new record within the parcel fabric
+        /// found in the active map. If a parcel
+        /// fabric is not found it will display
+        /// a message indicating the problem.
         /// </summary>
-        public void SetDocumentNumber()
+
+        /// <returns></returns>
+        public async Task AsyncCreateNewRecord()
         {
 
-            switch (_afcTypeCd)
+            try
             {
-                case 1:                                     // Addition
-                    _docNum = _instrumentNum;
-                    break;
+
+                // Pass in record name, record type, afctype, 
+                // recorded date, effective date, and record status
+                string _name = this.DOC_NUM;
+                string _afcNote = this.AFC_NOTE;
+                int _recordType = this.RECORD_TYPE;
+                int _afcType = this.AFC_TYPE_CD;
+                DateTime _recordedDate = this.FILE_DATE;
+                DateTime _effectiveDate = this.EFFECTIVE_DT;
+                int _recordStatus = this.RECORD_STATUS;
 
 
-                case 2:                                     // Split
-                    _docNum = _instrumentNum;
-                    break;
+                string errorMessage = await QueuedTask.Run(async () =>
+                {
+                    Dictionary<string, object> RecordAttributes = new Dictionary<string, object>();
+                    // TODO REMOVE: string sNewRecord = _name;
 
-                case 3:                                     // Research
-                    _docNum = String.Format("{0}-{1}",_afcYear.ToString(), _seqNum);
-                    break;
+                    try
+                    {
+                        var myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
+                        //if there is no fabric in the map then bail
+                        if (myParcelFabricLayer == null)
+                            return "There is no fabric in the map.";
+                        var recordsLayer = await myParcelFabricLayer.GetRecordsLayerAsync();
+                        var editOper = new EditOperation()
+                        {
+                            Name = "Create Parcel Fabric Record",
+                            ProgressMessage = "Create Parcel Fabric Record...",
+                            ShowModalMessageAfterFailure = true,
+                            SelectNewFeatures = false,
+                            SelectModifiedFeatures = false
+                        };
+                        RecordAttributes.Add("Name", _name);
+                        RecordAttributes.Add("RecordType", _recordType);
+                        RecordAttributes.Add("RecordedDate", _recordedDate);
+                        RecordAttributes.Add("EffectiveDate", _effectiveDate);
+                        RecordAttributes.Add("AFCType", _afcType);
+                        RecordAttributes.Add("RecordStatus", _recordStatus);
+                        // TODO: Include additional record attributes here
+                        // RecordAttributes.Add("Attribute01", sAttribute01);
+                        // RecordAttributes.Add("Attribute02", sAttribute02)
+                        // Etc...
 
-                default:                                    // Not provided
-                    _docNum = "Assign an AFC log...";
-                    break;
+                        var editRowToken = editOper.CreateEx(recordsLayer.FirstOrDefault(), RecordAttributes);
+                        if (!editOper.Execute())
+                            return editOper.ErrorMessage;
+
+                        var defOID = -1;
+                        var lOid = editRowToken.ObjectID.HasValue ? editRowToken.ObjectID.Value : defOID;
+                        await myParcelFabricLayer.SetActiveRecordAsync(lOid);
+                    }
+                    catch (Exception ex)
+                    {
+                        return ex.Message;
+                    }
+                    return "";
+                });
+                if (!string.IsNullOrEmpty(errorMessage))
+                    MessageBox.Show(errorMessage, String.Format("Created New Record: {0} - {1}.", _name, _afcNote));
+
+
             }
+            catch (Exception ex)
+            {
+
+                ErrorLogs.WriteLogEntry("Create New Record", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+            }
+
+            finally
+            {
+                this._recordCreated = true;
+                
+            }
+
+
+
         }
 
+
+
+        #endregion
+
+
+
+
+        #endregion
+
+
+        #region Display Test Message
         /// <summary>
-        /// Sets the record type based 
-        /// on the document type.
+        /// Asynchronous method that
+        /// displays a message to the
+        /// user.
         /// </summary>
-        public void SetRecordType()
+        /// <returns></returns>
+        public async Task AsyncDisplayTestMessage()
         {
-            switch (_docType)
+            try
             {
-                case AOH:
-                    _recordType = 1;
-                    break;
 
-                case AMD:
-                    _recordType = 2;
-                    break;
+                await QueuedTask.Run(() =>
+                {
+                    var dialogResult = MessageBox.Show(String.Format("User: {0} clicked the image!", GetCurrentUser()));
+                    if (dialogResult == System.Windows.MessageBoxResult.OK)
+                    {
+                        MessageBox.Show("Ok Clicked");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Cancel Clicked");
+                    }
+                });
 
-                case ALD:
-                    _recordType = 3;
-                    break;
-
-                case BOS:
-                    _recordType = 4;
-                    break;
-
-                case COD:
-                    _recordType = 5;
-                    break;
-
-                case CND:
-                    _recordType = 6;
-                    break;
-
-                case CFD:
-                    _recordType = 7;
-                    break;
-
-                case COS:
-                    _recordType = 8;
-                    break;
-
-                case CON:
-                    _recordType = 9;
-                    break;
-
-                case DCA:
-                    _recordType = 10;
-                    break;
-
-                case DED:
-                    _recordType = 11;
-                    break;
-
-                case EAS:
-                    _recordType = 12;
-                    break;
-
-                case GWD:
-                    _recordType = 13;
-                    break;
-
-                case GFT:
-                    _recordType = 14;
-                    break;
-
-                case JDG:
-                    _recordType = 15;
-                    break;
-
-                case ORD:
-                    _recordType = 16;
-                    break;
-
-                case PLT:
-                    _recordType = 17;
-                    break;
-
-                case QCD:
-                    _recordType = 18;
-                    break;
-
-                case ROW:
-                    _recordType = 19;
-                    break;
-
-                case RWD:
-                    _recordType = 20;
-                    break;
-
-                case SHD:
-                    _recordType = 21;
-                    break;
-
-                case TRM:
-                    _recordType = 22;
-                    break;
-
-                case TRD:
-                    _recordType = 23;
-                    break;
-
-                case TRS:
-                    _recordType = 24;
-                    break;
-
-                case WAD:
-                    _recordType = 25;
-                    break;
-
-                case WD2:
-                    _recordType = 26;
-                    break;
-
-                default:
-                    break;
             }
+            catch (Exception ex)
+            {
+
+                ErrorLogs.WriteLogEntry("Create Records Add-In", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+            }
+
+
         }
+
+        #endregion
+
 
         #endregion
 

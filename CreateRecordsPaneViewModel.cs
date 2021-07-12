@@ -116,6 +116,7 @@ namespace pro_createrecords_addin
         private const string _yes = "Y";
         private const string _blank = "";
         private ObservableCollection<AFCLog> _afclogs = new ObservableCollection<AFCLog>();
+        private ObservableCollection<AFCLog> _records = new ObservableCollection<AFCLog>();
         private ReadOnlyObservableCollection<AFCLog> _afclogsRO;
         private Object _lockObj = new object();
 
@@ -129,7 +130,7 @@ namespace pro_createrecords_addin
          *     involves  cleaning up GIS data only and no legal document is triggering a parcel change.   *
          *************************************************************************************************/
         public ICommand RefreshListCommand { get; set; }
-        public ICommand CreateRecordCommand { get; set; }
+
         public ICommand CreateCleanupRecordCommand { get; set; }
 
 
@@ -170,7 +171,7 @@ namespace pro_createrecords_addin
              * *****************************************************************************/
 
             RefreshListCommand = new AsyncRelayCommand( func => AsyncSearchForAFCLogs());
-            CreateRecordCommand = new AsyncRelayCommand( func => AsyncDisplayTestMessage());
+            //
             //CreateCleanupRecord = new AsyncRelayCommand(func => AsyncCreateCleanupRecord());
 
 
@@ -203,6 +204,11 @@ namespace pro_createrecords_addin
             get { return _afclogsRO; }
 
 
+        }
+
+        public ReadOnlyObservableCollection<AFCLog> Records
+        {
+            get { return}
         }
 
         /// <summary>
@@ -292,6 +298,10 @@ namespace pro_createrecords_addin
         {
             if (AFCLogs.Count > 0)
             {
+                foreach (var afclog in AFCLogs)
+                {
+                    //if afclog.re
+                }
                 ClearAFCLogsCollection();
 
             }
@@ -299,7 +309,7 @@ namespace pro_createrecords_addin
             await QueuedTask.Run(() =>
             {
                 // Get a list of AFC Logs
-                SearchingATable(_searchString);
+                PopulateAFCLogCollection(_searchString);
 
                 // Search for AFC Logs
                 // and apply search string
@@ -371,9 +381,9 @@ namespace pro_createrecords_addin
 
         #endregion
 
-        #region Searching a Table using QueryFilter and Populates AFCLogs List
+        #region Populates AFCLog Collection
 
-        public async Task SearchingATable(string _searchString)
+        public async Task PopulateAFCLogCollection(string _searchString)
         {
             // Define columns to be included in
             // query filter
@@ -471,6 +481,11 @@ namespace pro_createrecords_addin
                                     afcLog.SetImageSource();    // Method sets the image source for the afc log type
                                     afcLog.SetDocumentNumber(); // Method sets the document number for the afc log type
                                     afcLog.SetRecordType();     // Method sets the record type for the afc log
+
+                                    // Set the record status based on
+                                    // the AFC status code
+                                    afcLog.SetRecordStatus(); 
+                                    
                                     _afcCount += 1;             // Increment afc count variable
                                     // Reads and Writes should be made from within the lock
                                     lock (_lockObj)
@@ -540,94 +555,7 @@ namespace pro_createrecords_addin
 
         #endregion
 
-        #region Parcel Fabric Methods
-
-        #region Create a New Record
-            
-            /// <summary>
-            /// This asynchronous method creates
-            /// a new record within the parcel fabric
-            /// found in the active map. If a parcel
-            /// fabric is not found it will display
-            /// a message indicating the problem.
-            /// </summary>
-            /// <param name="_name"></param>
-            /// <param name="_recordType"></param>
-            /// <param name="_afcType"></param>
-            /// <param name="_recordedDate"></param>
-            /// <param name="_effectiveDate"></param>
-            /// <param name="_recordStatus"></param>
-            /// <returns></returns>
-            public async Task AsyncCreateNewRecord(string _name, int _recordType, int _afcType, DateTime _recordedDate, DateTime _effectiveDate, int _recordStatus)
-            {
-
-                // TODO: Pass in record name, record type, afctype, 
-                // recorded date, effective date, and record status
-
-                string errorMessage = await QueuedTask.Run(async () =>
-                {
-                    Dictionary<string, object> RecordAttributes = new Dictionary<string, object>();
-                    // TODO REMOVE: string sNewRecord = _name;
-
-                    try
-                    {
-                        var myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
-                        //if there is no fabric in the map then bail
-                        if (myParcelFabricLayer == null)
-                            return "There is no fabric in the map.";
-                        var recordsLayer = await myParcelFabricLayer.GetRecordsLayerAsync();
-                        var editOper = new EditOperation()
-                        {
-                            Name = "Create Parcel Fabric Record",
-                            ProgressMessage = "Create Parcel Fabric Record...",
-                            ShowModalMessageAfterFailure = true,
-                            SelectNewFeatures = false,
-                            SelectModifiedFeatures = false
-                        };
-                        RecordAttributes.Add("Name", _name);
-                        RecordAttributes.Add("RecordType", _recordType);
-                        RecordAttributes.Add("RecordedDate", _recordedDate);
-                        RecordAttributes.Add("EffectiveDate", _effectiveDate);
-                        RecordAttributes.Add("AFCType", _afcType);
-                        // TODO: Include additional record attributes here
-                        // RecordAttributes.Add("Attribute01", sAttribute01);
-                        // RecordAttributes.Add("Attribute02", sAttribute02)
-                        // Etc...
-
-                        var editRowToken = editOper.CreateEx(recordsLayer.FirstOrDefault(), RecordAttributes);
-                        if (!editOper.Execute())
-                            return editOper.ErrorMessage;
-                
-                        var defOID = -1;
-                        var lOid = editRowToken.ObjectID.HasValue ? editRowToken.ObjectID.Value : defOID;
-                        await myParcelFabricLayer.SetActiveRecordAsync(lOid);
-                    }
-                    catch (Exception ex)
-                    {
-                        return ex.Message;
-                    }
-                    return "";
-                });
-                if (!string.IsNullOrEmpty(errorMessage))
-                    MessageBox.Show(errorMessage, "Create New Record.");
-
-        }
-
-
-
-        #endregion
-
-        #region Display Test Message
-
-            public async Task AsyncDisplayTestMessage()
-        {
-            MessageBox.Show(String.Format("User: {0} clicked the image!", AFCLog.GetCurrentUser()));
-        }
-
-        #endregion
-
-
-        #endregion
+        
 
         #region Delegates
 
