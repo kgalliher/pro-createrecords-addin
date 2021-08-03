@@ -62,17 +62,32 @@ SELECT  AFC.AFC_LOG_ID
 	    *   Make sure the appropriate path    *
 		*   to the mars database is supplied  *
 	    **************************************/
-	   FROM DCADSQLVM01.DBPROD.DBO.AFC_LOG AFC  
+	   FROM DBPROD.DBO.AFC_LOG AFC  
 
 	   INNER JOIN
 
-	   DCADSQLVM01.DBPROD.DBO.DEED_MAIN DEED
+	   DBPROD.DBO.DEED_MAIN DEED
 
 	   ON AFC.INSTRUMENT_NUM = DEED.INSTRUMENT_NUM
 	   
-	   
+	   LEFT OUTER JOIN
+
+	   /************************************
+	   * This left outer join checks for a *
+	   * record in the records feature	   *
+	   * class with the same document	   *
+	   * number as the AFC Log. Any		   *
+	   * matching cases are excluded from  *
+	   * the database view                 *
+	   ************************************/
+
+	   ADM.PARCELFABRIC_STAGING_RECORDS R
+
+	   ON AFC.INSTRUMENT_NUM      = R.NAME OR
+	      AFC.SEQ_NUM             = RIGHT(R.NAME, 7)
 	   
 	   WHERE AFC.DRAFTER_EMPL_ID = CONVERT(CHAR(8), RIGHT(UPPER(RTRIM(SYSTEM_USER)), LEN(SYSTEM_USER) - 5))
 	     AND AFC.AFC_YEAR IN (YEAR(GETDATE()) - 1, YEAR(GETDATE()))
 		 AND AFC.DRAFTER_COMP_DT = '1900-01-01 00:00:00.000'
 		 AND AFC.AFC_STATUS_CD IN (1, 4)
+		 AND R.NAME IS NULL
