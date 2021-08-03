@@ -1,29 +1,63 @@
 ﻿#region "CLASS DOCUMENTATION"
 /*
  * ***************************************************************************************************************************************************************
- * Project:         Name of the Project
- * Class:           Name of the Class in the Project
+ * Project:         pro-createrecords-addin
+ * Class:           AFCLog.cs
  * Version:         1.0
- * Author:          Name of the person(s) who wrote the script
- * Date Created:    Date Project Created (mm/dd/yyyy)
+ * Author:          John W. Fell
+ * Date Created:    06/24/2021
  * Date Launched:   Date Project launched for general use (mm/dd/yyyy)
  * Dept:            GIS Division
- * Location:        Project file location (...\ArcAdmin\ProjectFolder...)
- * Revisions:       mm/dd/yyyy -programmer-: Summary of modifications to code or Docked Window
+ * Location:        https://github.com/dcadgis/pro-createrecords-addin/
+ * Revisions:       
  * ***************************************************************************************************************************************************************
  * 
  * CLASS
- * PURPOSE:     A brief explanation for, why this class is needed in the project.
- *             (example- This class contains methods used for querying data in GPUB.)
+ * PURPOSE:     Represents an AFC Log with properties and methods for
+ *              creating records. 
  *
  * CLASS
- * DESCRIPTION: Describe the functionality or controls contained in the class
- *              (example- This class accepts parameters from AnotherClass.cs to query GPUB and populate a ListArray, which is used by YetAnotherClass.cs.)
+ * DESCRIPTION: An AFC log translates fairly seamlessly
+ *              with esri's definition of a parcel fabrci "record." This
+ *              class acts as a container to organize properties and 
+ *              methods that will convert AFC logs into records within the
+ *              ArcGIS Pro SDK framework.There are a number of properties that
+ *              are specific to an AFC log such as instrument or sequence number,
+ *              file and effective dates, tile number, etc that unique identify the
+ *              AFC log. Not only are properties stored within this class, but course
+ *              and fine-grained methods help to represent AFC log information to users
+ *              within an ArcGIS Pro SDK dockpane with a customize panel. The binding
+ *              of the AFC Logs observable collection views each item as an AFC Log,
+ *              object represented by this class, and helper methods faciliate creation
+ *              of records, raising events, and disabling methods when certain criteria
+ *              are met.
  *
  * CLASS
- * PROPERTIES:   Describe the properties (protected or otherwise) for this class.
- *              (example- layer internal variable from AnotherClass.cs)
- *
+ * PROPERTIES:  
+ *              AFC_LOG_ID     - The ID number of the AFC Log represented in Mars.
+ *              AFC_YEAR       - The year the AFC log was created.
+ *              ACCOUNT_NUM    - The parent account number for the AFC log.
+ *              AFC_TYPE_CD    - The type of AFC log (1 - Addition, 2 - Split/Deed, or 3 - Research Form).
+ *              AFC_STATUS_CD  - The status of the AFC log:
+ *                                1 - Active:           The AFC log is able to be processed by GIS
+ *                                2 - Completed:        The AFC log has been completed and sent to PRE for processing
+ *                                3 - Peinding:         The AFC log is unable to be completed for some reason
+ *                                4 - Cert-Hold:        The AFC log is waiting for completion of the certification cycle
+ *                                5 - Deleted:          The AFC log was deleted and is no longer available
+ *                                6 - Quality Control:  The AFC log is currently under review by GIS staff
+ *                                7 - Corrections:      The AFC log is in need of corrections before sending to PRE
+ *              FILE_DATE      - The date that the document triggering the AFC log was recorded or filed.
+ *              AFC_NOTE       - The description of the AFC log supplied by the creator.
+ *              DOC_IMAGE      - The path to the image displayed in the dock pane and defined by AFC_TYPE_CD.
+ *              DOC_TYPE       - The type of recorded document (e.g., Warranty Deed or Plat).
+ *              INSTRUMENT_NUM - The recorder's instrument number for the plat or deed.
+ *              SEQ_NUM        - The DCAD supplied sequence number in MMYY-SS format where SS is the sequence of the 
+ *                               research form (e.g., 01, 02, 03, etc.).
+ *              DOC_NUM        - The number (instrument number or sequence number + AFC year) that will be used
+ *                               as the derived record name for the AFC log.
+ *              RUSH_IND       - Determines if the AFC log needs to be expedited.
+ *              
+ *              
  * CLASS 
  * METHODS:     Provide a list of the Methods available in this class and a brief explanation of their function.
  *              (example- GetSomeQuery() method accepts parameters from layer variable & accesses xyz feature class in GPUB and returns results in a ListArray.)
@@ -85,6 +119,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace pro_createrecords_addin
@@ -164,7 +199,8 @@ namespace pro_createrecords_addin
         private string _docType;          // Description of the deed type from DEED_MAIN table
         private int _recordType;          // Variable that holds the record type based on the doc type
         private int _recordStatus;        // Determines if the record's parcels should be published.
-
+        private bool _validafclog;        // Boolean value that determines if the afc log is valid.
+        private Brush _messageColor;      // Brush object to color the foreground for the listbox item's text property.
 
         #endregion
 
@@ -197,6 +233,8 @@ namespace pro_createrecords_addin
             _docType = BLANK;
             _recordType = 0;
             _recordStatus = 0;
+            _validafclog = true;
+
 
              /******************************************************************************
              * Hook CreateRecord commands                                                  *
@@ -205,11 +243,12 @@ namespace pro_createrecords_addin
              * be called from custom button controls on the xaml UI.                       *
              * ****************************************************************************/
 
-            CreateRecordCommand = new AsyncRelayCommand(func => AsyncCreateNewRecord());
+            CreateRecordCommand = new AsyncRelayCommand(func => AsyncCreateNewRecord(), () => this.VALID_AFC_LOG);
 
             #endregion
 
         }
+
 
         #region Properties
 
@@ -443,6 +482,32 @@ namespace pro_createrecords_addin
             set { _recordStatus = value; }
         }
 
+        /// <summary>
+        /// Public boolean property
+        /// that defines a null afc
+        /// log.
+        /// </summary>
+        public bool VALID_AFC_LOG
+        {
+            get { return _validafclog; }
+            set { _validafclog = value; }
+        }
+
+        /// <summary>
+        /// Private variable for
+        /// message color or font color
+        /// in MVVM for the document number.
+        /// </summary>
+        public Brush MSG_COLOR_DOC_NUM
+        { get; set; }
+
+        /// <summary>
+        /// Private variable for
+        /// message color or font color
+        /// in MVVM for the account number.
+        /// </summary>
+        public Brush MSG_COLOR_ACCT_NUM
+        { get; set; }
 
 
 
@@ -452,11 +517,11 @@ namespace pro_createrecords_addin
 
 
         #region Get Current User
-            /// <summary>
-            /// Identifies the authenticated user.
-            /// </summary>
-            /// <returns>The string containing the user name without the domain.</returns>
-            public static string GetCurrentUser()
+        /// <summary>
+        /// Identifies the authenticated user.
+        /// </summary>
+        /// <returns>The string containing the user name without the domain.</returns>
+        public static string GetCurrentUser()
             {
                 // Get the logged in user
                 #pragma warning disable CA1416 // Disable platform compatibility
@@ -679,6 +744,41 @@ namespace pro_createrecords_addin
             }
         #endregion
 
+        #region Set Foreground Color
+         
+            /// <summary>
+            /// 
+            /// </summary>
+            /// <param name="_foregroundType"></param>
+            /// <returns></returns>
+            public Brush SetForegroundColor(int _foregroundType)
+            {
+                if (_rush)
+                {
+                
+                    return System.Windows.Media.Brushes.Red;
+                
+                }
+                else
+                {
+                    switch (_foregroundType)
+                    {
+                        case 1:                             // Document Number
+                            return System.Windows.Media.Brushes.Black;
+                            break;
+                        default:                            // Account Number
+                            return System.Windows.Media.Brushes.Gray;
+                            break;
+                    }
+                }
+            }
+
+
+        #endregion
+
+
+
+
         #region Parcel Fabric Methods
 
         #region Create a New Record
@@ -729,16 +829,16 @@ namespace pro_createrecords_addin
                             SelectNewFeatures = false,
                             SelectModifiedFeatures = false
                         };
+
+                         /**********************************************
+                         * Assign local variables to record attributes *
+                         * ********************************************/
                         RecordAttributes.Add("Name", _name);
                         RecordAttributes.Add("RecordType", _recordType);
                         RecordAttributes.Add("RecordedDate", _recordedDate);
                         RecordAttributes.Add("EffectiveDate", _effectiveDate);
                         RecordAttributes.Add("AFCType", _afcType);
                         RecordAttributes.Add("RecordStatus", _recordStatus);
-                        // TODO: Include additional record attributes here
-                        // RecordAttributes.Add("Attribute01", sAttribute01);
-                        // RecordAttributes.Add("Attribute02", sAttribute02)
-                        // Etc...
 
                         var editRowToken = editOper.CreateEx(recordsLayer.FirstOrDefault(), RecordAttributes);
                         if (!editOper.Execute())
@@ -755,19 +855,32 @@ namespace pro_createrecords_addin
                     return "";
                 });
                 if (!string.IsNullOrEmpty(errorMessage))
-                    MessageBox.Show(errorMessage, String.Format("Created New Record: {0} - {1}.", _name, _afcNote));
+                {
+                    ErrorLogs.WriteLogEntry("Create New Record Add-In: Create New Record", errorMessage, System.Diagnostics.EventLogEntryType.Error);
+                }
+                else
+                {
+                    MessageBox.Show(String.Format("Created Record: {0} - {1}.", _name, _afcNote));
+                }
 
-
+                
             }
             catch (Exception ex)
             {
 
-                ErrorLogs.WriteLogEntry("Create New Record", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                ErrorLogs.WriteLogEntry("Create New Record Add-In: Create New Record", ex.Message, System.Diagnostics.EventLogEntryType.Error);
             }
 
             finally
             {
-                this._recordCreated = true;
+                 /*************************************
+                 * The RecordCreatedEvent is          *
+                 * raised and notifies the View       *
+                 * Model to refresh the dock pane     *
+                 * and displaying AFC logs from the   *
+                 * updated database view.             *
+                 * ***********************************/
+                RaiseRecordCreatedEvent(this);
                 
             }
 
@@ -784,6 +897,18 @@ namespace pro_createrecords_addin
 
         #endregion
 
+        #region Events
+
+        #region RecordCreated Event
+        /// <summary>
+        /// Used to identify when a record
+        /// is created using the Create New
+        /// Record method.
+        /// </summary>
+        public event EventHandler<RecordCreatedEventArgs> RecordCreatedEvent;
+            #endregion
+
+        #endregion
 
         #region Display Test Message
         /// <summary>
@@ -823,8 +948,33 @@ namespace pro_createrecords_addin
         #endregion
 
 
+        #region Raise Record Created Event
+
+        /// <summary>
+        /// Raise the RecordCreated event.
+        /// </summary>
+        /// <param name="_afclog"></param>
+        public void RaiseRecordCreatedEvent(AFCLog _afclog)
+        {
+            RecordCreatedEventArgs args = new RecordCreatedEventArgs();
+            args.RecordName = _afclog.DOC_NUM;
+            args.DateCreated = DateTime.Now;
+            RecordCreatedEvent?.Invoke(_afclog, args);
+         }
+
         #endregion
 
+        #endregion
+
+
+    }
+
+
+
+    public class RecordCreatedEventArgs
+    {
+        public string RecordName { get; set; }
+        public DateTime DateCreated { get; set; } 
 
     }
 }

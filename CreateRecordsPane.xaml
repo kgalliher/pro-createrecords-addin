@@ -78,9 +78,17 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="400"/>
                             </Grid.ColumnDefinitions>
-                            
-                            <TextBlock TextAlignment="Left" FontFamily="Century Gothic" FontSize="24" FontStretch="UltraExpanded" FontStyle="Normal" FontWeight="UltraBold" TextTrimming="CharacterEllipsis"  Text="{Binding DOC_NUM}" HorizontalAlignment="Left" VerticalAlignment="Top" />
-                            <TextBlock TextAlignment="Left" FontFamily="Century Gothic" FontSize="18" Foreground="Gray" FontStretch="UltraExpanded" FontStyle="Normal" FontWeight="Bold" TextTrimming="CharacterEllipsis"  Text="{Binding Path=ACCOUNT_NUM, StringFormat='Account #: {0}'}" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+
+                            <TextBlock TextAlignment="Left" FontFamily="Century Gothic" FontSize="24" FontStretch="UltraExpanded" FontStyle="Normal" FontWeight="UltraBold" TextTrimming="CharacterEllipsis"  Text="{Binding DOC_NUM}" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                <TextBlock.Foreground>
+                                    <SolidColorBrush Color="{Binding MSG_COLOR_DOC_NUM}"/>
+                                </TextBlock.Foreground>
+                            </TextBlock>
+                            <TextBlock TextAlignment="Left" FontFamily="Century Gothic" FontSize="18" FontStretch="UltraExpanded" FontStyle="Normal" FontWeight="Bold" TextTrimming="CharacterEllipsis"  Text="{Binding Path=ACCOUNT_NUM, StringFormat='Account #: {0}'}" HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                                <TextBlock.Foreground>
+                                    <SolidColorBrush Color="{Binding MSG_COLOR_ACCT_NUM}"/>
+                                </TextBlock.Foreground>
+                            </TextBlock>
                             <!--<TextBlock TextAlignment="Left" FontFamily="Century Gothic" FontSize="12" Foreground="Gray" FontStretch="SemiCondensed" FontStyle="Normal" FontWeight="Bold" TextTrimming="CharacterEllipsis"  Text="{Binding Path=AFC_NOTE, StringFormat='AFC Note: {0}'}" HorizontalAlignment="Left" VerticalAlignment="Bottom" />-->
                             <Button Name="btnCreateRecord" Command="{Binding Path=CreateRecordCommand}" Background="Transparent" Foreground="Transparent" BorderBrush="Transparent" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Create a Record for this AFC Log">
                                 <Image Source="{Binding DOC_IMAGE}" HorizontalAlignment="Right" Stretch="None" VerticalAlignment="Top" />

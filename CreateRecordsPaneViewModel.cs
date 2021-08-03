@@ -95,9 +95,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Data;
 using System.Windows.Input;
 using Microsoft.Toolkit.Mvvm.Input;
-using System.Windows;
-using ArcGIS.Desktop.Mapping;
-using ArcGIS.Desktop.Editing;
+using System.Windows.Media;
 
 namespace pro_createrecords_addin
 {
@@ -142,18 +140,20 @@ namespace pro_createrecords_addin
             // included in the current map and that the AFC Log View exists
             // in the geodatabase
 
-            /******************************************************************
-             * ReadOnlyObservableCollection for AFC Logs binding:
-             * This variable is assigned a new ReadOnlyObservableCollection
-             * bound to the public ObservableCollection object _afclogs.
-             * The _afclogs variable is a collection of AFCLog objects and 
-             * is manipulated based on the contents of the ADM.AFC_LOG_VW
-             * database view. To update the list of AFC logs in the
-             * wrap panel properly, a lock object must be used to add
-             * items to the _afclogs list. However, the AFC logs list only
-             * updates as changes occur to the database view when bound to
-             * a ReadOnlyObservableCollection, hence this approach is used.
-             ******************************************************************/ 
+
+
+        /******************************************************************
+         * ReadOnlyObservableCollection for AFC Logs binding:
+         * This variable is assigned a new ReadOnlyObservableCollection
+         * bound to the public ObservableCollection object _afclogs.
+         * The _afclogs variable is a collection of AFCLog objects and 
+         * is manipulated based on the contents of the ADM.AFC_LOG_VW
+         * database view. To update the list of AFC logs in the
+         * wrap panel properly, a lock object must be used to add
+         * items to the _afclogs list. However, the AFC logs list only
+         * updates as changes occur to the database view when bound to
+         * a ReadOnlyObservableCollection, hence this approach is used.
+         ******************************************************************/
 
             _afclogsRO = new ReadOnlyObservableCollection<AFCLog>(_afclogs);
             BindingOperations.EnableCollectionSynchronization(_afclogsRO, _lockObj);
@@ -206,15 +206,10 @@ namespace pro_createrecords_addin
 
         }
 
-        public ReadOnlyObservableCollection<AFCLog> Records
-        {
-            get { return}
-        }
-
         /// <summary>
         /// Text shown near the top of the DockPane.
         /// </summary>
-        private string _heading = "Create a Records from an Existing AFC Log";
+        private string _heading = "Create a Record from an Existing AFC Log";
         public string Heading
         {
             get { return _heading; }
@@ -254,8 +249,7 @@ namespace pro_createrecords_addin
         {
             get { return _selectedAFCLog; }
             set { _selectedAFCLog = value; }
-            // TODO: Create a record for the selected AFC Log
-            // CreateRecordForSelectedAFCLog();
+
         }
 
         #endregion
@@ -293,6 +287,9 @@ namespace pro_createrecords_addin
 
         /// <summary>
         /// Update the list of AFC Logs given the current search text.
+        /// If the AFC Log has already had a record created during the 
+        /// current session, then skip this AFC log and do not add it
+        /// to the Create Records Pane collection. 
         /// </summary>
         public async Task AsyncSearchForAFCLogs(string _searchString = _blank)
         {
@@ -300,7 +297,10 @@ namespace pro_createrecords_addin
             {
                 foreach (var afclog in AFCLogs)
                 {
-                    //if afclog.re
+                    if (afclog.RECORD_CREATED)
+                    {
+                        _records.Add(afclog);
+                    }
                 }
                 ClearAFCLogsCollection();
 
@@ -366,6 +366,13 @@ namespace pro_createrecords_addin
                         }
                     }
 
+                    /**********************************************
+                     * Remove any items that are included in
+                     * the records collection because these
+                     * have already had a record created
+                     * during this session.
+                     * *******************************************/
+
                  // Remove temporary observable collection
                  _tempafclogs = null;
                 
@@ -393,6 +400,8 @@ namespace pro_createrecords_addin
             int _afcCount = 0;
             string _whereClause = _blank;
             bool _acctNumBlank = false;
+            int _docNumType = 1;         // Helps the SetForegroundColor method know the color type for DOC_NUM.
+            int _acctNumTYpe = 2;        // Helps the SetForegroundColor method know the color type for ACCOUNT_NUM.
 
             // Define where clause based
             // on search string contents
@@ -484,8 +493,22 @@ namespace pro_createrecords_addin
 
                                     // Set the record status based on
                                     // the AFC status code
-                                    afcLog.SetRecordStatus(); 
-                                    
+                                    afcLog.SetRecordStatus();   // Method that sets the record status for the afc log
+
+                                    /***************************************
+                                    * Subscribe to RecordCreated Event in *
+                                    * the AFCLog class.                   *
+                                    * ************************************/
+                                    afcLog.RecordCreatedEvent += OnRecordCreated;
+
+                                    /***********************************************
+                                    * Set the foreground color for the document    *
+                                    * and account number properties based on the   *
+                                    * RUSH_IND (if yes == RED else Black/Gray      *
+                                    * *********************************************/
+                                    afcLog.SetForegroundColor(_docNumType);
+                                    afcLog.SetForegroundColor(_acctNumTYpe);
+
                                     _afcCount += 1;             // Increment afc count variable
                                     // Reads and Writes should be made from within the lock
                                     lock (_lockObj)
@@ -506,12 +529,41 @@ namespace pro_createrecords_addin
                 // One of the fields in the where clause might not exist. 
                 // There are multiple ways this can be handled:
                 // Handle error appropriately
-                ErrorLogs.WriteLogEntry("Create Records Add-In", fieldException.Message, System.Diagnostics.EventLogEntryType.Error);
+                ErrorLogs.WriteLogEntry("Create Records Add-In: Populate AFC Log Collection", fieldException.Message, System.Diagnostics.EventLogEntryType.Error);
             }
             catch (Exception exception)
             {
-                // logger.Error(exception.Message);
+                ErrorLogs.WriteLogEntry("Create Records Add-In: Populate AFC Log Collection", exception.Message, System.Diagnostics.EventLogEntryType.Error);
             }
+        }
+
+
+
+        /// <summary>
+        /// When a record is created, the dock pane should
+        /// refresh and remove the newly created AFC log
+        /// from the observable collection based on
+        /// the database view. The database view involves
+        /// a join on the records feature class and removes
+        /// any AFC Logs whose document number matches an
+        /// existing record in the feature class.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void OnRecordCreated(object sender, RecordCreatedEventArgs e)
+        {
+            try
+            {
+
+                AsyncSearchForAFCLogs();
+
+            }
+            catch (Exception exception)
+            {
+
+                ErrorLogs.WriteLogEntry("Create Records Add-In: OnRecordCreated Event Handler", exception.Message, System.Diagnostics.EventLogEntryType.Error);
+            }
+
         }
 
 
@@ -532,6 +584,8 @@ namespace pro_createrecords_addin
                     * Displays a default afc log row in the       *
                     * observable collection. See details in       *
                     * the AFCLog class.                           *
+                    * This type of afc log is not valid, but just *
+                    * displays an empty marker with message.      *
                     **********************************************/
         
                     if (_afcCount == 0)
@@ -539,14 +593,24 @@ namespace pro_createrecords_addin
                         AFCLog afcLog = new AFCLog();
                         afcLog.AFC_LOG_ID = 1;
                         afcLog.AFC_STATUS_CD = 99;
+                        afcLog.VALID_AFC_LOG = false;
                         afcLog.SetImageSource();
                         afcLog.SetDocumentNumber();
-                        lock (_lockObj)
+
+
+                lock (_lockObj)
                         {
                             _afclogs.Add(afcLog);
                         }
+
+                
                     }
         
+                    /***************************************
+                     * Disable the create record button    *
+                     * for this type of entry.             *
+                     * ************************************/
+                     
         
                 }
         #endregion
@@ -555,7 +619,7 @@ namespace pro_createrecords_addin
 
         #endregion
 
-        
+
 
         #region Delegates
 
