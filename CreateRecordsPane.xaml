@@ -17,13 +17,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
     <Grid>
-        <!--<Grid.Resources>
-            <Style TargetType="{x:Type ListBoxItem}">
-                <Setter Property="HorizontalAlignment" Value="Center" />
-                <Setter Property="VerticalAlignment" Value="Center" />
-            </Style>
-        </Grid.Resources>-->
-        <Grid Margin="4">
+         <Grid Margin="4">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="4"/>
@@ -38,17 +32,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Dockpane Header
-            <DockPanel Grid.Row="0" LastChildFill="False" KeyboardNavigation.TabNavigation="Local" Height="30">
-                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Heading}" Style="{DynamicResource Esri_TextBlockDockPaneHeader}">
-                    <TextBlock.ToolTip>
-                        <WrapPanel Orientation="Vertical" MaxWidth="300">
-                            <TextBlock Text="{Binding Heading}" TextWrapping="Wrap"/>
-                        </WrapPanel>
-                    </TextBlock.ToolTip>
-            </TextBlock> 
-        </DockPanel> -->
-            <!-- Label providing instructions-->
+             <!-- Label providing instructions-->
             <Label Grid.Row="0" Grid.Column="0" Content="" VerticalAlignment="Center" FontSize="14" />
             <Label Grid.Row="0" Grid.Column="1" Content="Enter an instrument or sequence number" VerticalAlignment="Center" />
             
@@ -59,12 +43,30 @@
             <!-- Place holder for create cleanup record button -->
             <TextBlock Grid.Row="4" Grid.Column="0" Text="" VerticalAlignment="Center" />
             <Button x:Name="btnRefreshList" Grid.Row="4" Grid.Column="1" Width="80" HorizontalAlignment="Left" Content="Refresh List" Padding="5,0,5,0" Height="18" VerticalAlignment="Top" Command="{Binding Path=RefreshListCommand}" />
-            <Button x:Name="btnCreateCleanupRecord" Grid.Row="4" Grid.Column="1" Width="140" HorizontalAlignment="Right" Content="Create Cleanup Record" Padding="5,0,5,0" Command="{Binding Path=CreateCleanupRecordCommand}" />
-            
+            <ToggleButton x:Name="btnCreateCleanupRecord" Grid.Row="4" Grid.Column="1" Width="140" HorizontalAlignment="Right" Padding="5,0,5,0" Command="{Binding Path=CreateCleanupRecordCommand}">
+                <ToggleButton.Style>
+                    <Style TargetType="{x:Type ToggleButton}">
+                        <Style.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Content" Value="Return to AFC Logs" />
+                                <Setter Property="Background" Value="DimGray" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="False">
+                                <Setter Property="Content" Value="Create Cleanup Record" />
+                                <!--<Setter Property="Background" Value="LightGray" />-->
+                                <!--<Setter Property="Foreground" Value="Black" />-->
+                            </Trigger>                            
+                        </Style.Triggers>
+                    </Style>
+                </ToggleButton.Style>
+            </ToggleButton>
+             
+
             <!-- List box for Dock Pane Results -->
             <ListBox x:Name="afcListBox" Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="2"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" 
-                 ItemsSource="{Binding AFCLogs}"
+                 ItemsSource="{Binding PanelItems}"
                  SelectedItem="{Binding SelectedAFCLog, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 
                 <ListBox.ItemsPanel>

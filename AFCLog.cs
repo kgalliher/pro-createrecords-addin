@@ -111,16 +111,11 @@ using ArcGIS.Desktop.Mapping;
 using Microsoft.Toolkit.Mvvm.Input;
 using System;
 using System.Collections.Generic;
-using System.Data.Linq;
-using System.Data.Linq.Mapping;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace pro_createrecords_addin
 {
@@ -200,7 +195,8 @@ namespace pro_createrecords_addin
         private int _recordType;          // Variable that holds the record type based on the doc type
         private int _recordStatus;        // Determines if the record's parcels should be published.
         private bool _validafclog;        // Boolean value that determines if the afc log is valid.
-        private Brush _messageColor;      // Brush object to color the foreground for the listbox item's text property.
+        private Color _msgClrDocNum;      // Color object foreground for the listbox item's doc num text property .
+        private Color _msgClrAcctNum;     // Color object to color the foreground for the listbox item's account num text property.
 
         #endregion
 
@@ -243,14 +239,24 @@ namespace pro_createrecords_addin
              * be called from custom button controls on the xaml UI.                       *
              * ****************************************************************************/
 
-            CreateRecordCommand = new AsyncRelayCommand(func => AsyncCreateNewRecord(), () => this.VALID_AFC_LOG);
-
-            #endregion
-
-        }
+            CreateRecordCommand = new AsyncRelayCommand(func => AsyncCreateNewAFCRecord(), () => this.VALID_AFC_LOG);
 
 
-        #region Properties
+        #endregion
+
+    }
+
+
+        #region ICommand Wrappers
+
+        /**************************************************************************************************
+        * Public ICommand Implementations for Custom WPF Buttons. This allows the application to call    *
+        * existing methods in the ViewModel from the button using AsyncRelayCommand.                     *
+        * (1) CreateRecordCommand - Creates a new record based on selected AFC Log information.          *
+        * (2) CreateCleanupRecordCommand - Creates a new parcel fabric records of the cleanup type.      *
+        *     This is a custom record with specific attributes applied automatically when the workflow   *
+        *     involves  cleaning up GIS data only and no legal document is triggering a parcel change.   *
+        *************************************************************************************************/
 
         /// <summary>
         /// Represents a wrapper
@@ -258,6 +264,14 @@ namespace pro_createrecords_addin
         /// command.
         /// </summary>
         public ICommand CreateRecordCommand { get; set; }
+
+
+
+
+        #endregion
+
+        #region Properties
+
 
 
         /// <summary>
@@ -498,16 +512,23 @@ namespace pro_createrecords_addin
         /// message color or font color
         /// in MVVM for the document number.
         /// </summary>
-        public Brush MSG_COLOR_DOC_NUM
-        { get; set; }
+        public Color MSG_COLOR_DOC_NUM
+        {
+            get { return _msgClrDocNum; }
+            set { _msgClrDocNum = value; } 
+        }
 
         /// <summary>
         /// Private variable for
         /// message color or font color
         /// in MVVM for the account number.
         /// </summary>
-        public Brush MSG_COLOR_ACCT_NUM
-        { get; set; }
+        public Color MSG_COLOR_ACCT_NUM
+        {
+            get { return _msgClrAcctNum; }
+            set { _msgClrAcctNum = value; }
+        
+        }
 
 
 
@@ -745,33 +766,64 @@ namespace pro_createrecords_addin
         #endregion
 
         #region Set Foreground Color
-         
-            /// <summary>
-            /// 
-            /// </summary>
-            /// <param name="_foregroundType"></param>
-            /// <returns></returns>
-            public Brush SetForegroundColor(int _foregroundType)
+
+        /// <summary>
+        /// Returns a color object based on 
+        /// the property type and if the
+        /// AFC log is marked as a rush.
+        /// </summary>
+        /// <param name="_foregroundType"></param>
+        /// <returns></returns>
+        public void SetForegroundColor(int _foregroundType)
             {
-                if (_rush)
+
+            /**********************************************
+            * Define colors for dock pane text         ****
+            **********************************************/
+
+            try
                 {
-                
-                    return System.Windows.Media.Brushes.Red;
-                
-                }
-                else
-                {
-                    switch (_foregroundType)
+
+                    if (_rush)
                     {
-                        case 1:                             // Document Number
-                            return System.Windows.Media.Brushes.Black;
-                            break;
-                        default:                            // Account Number
-                            return System.Windows.Media.Brushes.Gray;
-                            break;
+
+                        // Rush (Both foreground types are red)
+
+                        _msgClrDocNum = Color.FromRgb(255, 0, 0);
+                        _msgClrAcctNum = Color.FromRgb(255, 0, 0);
+
+                    
                     }
+                    
+                    else if (_foregroundType == 1)
+                    
+                    {
+
+                        // Document Number (Black)
+                        
+                        _msgClrDocNum = Color.FromRgb(0, 0, 0);
+                    
+                    }
+                    
+                    else
+                    {
+
+                        // Account Number (Dark Gray)
+                        
+                        _msgClrAcctNum = Color.FromRgb(128, 128, 128);
+                    
+                    }
+
+
+                
                 }
-            }
+                catch (Exception ex)
+                {
+                
+                    ErrorLogs.WriteLogEntry("Create New Record Add-In: Set Foreground Color", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                }
+
+        }
 
 
         #endregion
@@ -792,7 +844,7 @@ namespace pro_createrecords_addin
         /// </summary>
 
         /// <returns></returns>
-        public async Task AsyncCreateNewRecord()
+        public async Task AsyncCreateNewAFCRecord()
         {
 
             try
@@ -812,7 +864,6 @@ namespace pro_createrecords_addin
                 string errorMessage = await QueuedTask.Run(async () =>
                 {
                     Dictionary<string, object> RecordAttributes = new Dictionary<string, object>();
-                    // TODO REMOVE: string sNewRecord = _name;
 
                     try
                     {
@@ -856,11 +907,11 @@ namespace pro_createrecords_addin
                 });
                 if (!string.IsNullOrEmpty(errorMessage))
                 {
-                    ErrorLogs.WriteLogEntry("Create New Record Add-In: Create New Record", errorMessage, System.Diagnostics.EventLogEntryType.Error);
+                    ErrorLogs.WriteLogEntry("Create New Record Add-In: Create New AFC Record", errorMessage, System.Diagnostics.EventLogEntryType.Error);
                 }
                 else
                 {
-                    MessageBox.Show(String.Format("Created Record: {0} - {1}.", _name, _afcNote));
+                    MessageBox.Show(String.Format("Created AFC Record: {0} - {1}.", _name, _afcNote));
                 }
 
                 
@@ -868,7 +919,7 @@ namespace pro_createrecords_addin
             catch (Exception ex)
             {
 
-                ErrorLogs.WriteLogEntry("Create New Record Add-In: Create New Record", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                ErrorLogs.WriteLogEntry("Create New Record Add-In: Create New AFC Record", ex.Message, System.Diagnostics.EventLogEntryType.Error);
             }
 
             finally
@@ -880,7 +931,7 @@ namespace pro_createrecords_addin
                  * and displaying AFC logs from the   *
                  * updated database view.             *
                  * ***********************************/
-                RaiseRecordCreatedEvent(this);
+                RaiseAFCRecordCreatedEvent(this);
                 
             }
 
@@ -895,17 +946,43 @@ namespace pro_createrecords_addin
 
 
 
+
+
+        #endregion
+
+        #region MapView Methods
+
+        /// MapView.ZoomToSelectedAsync(Timespan?)
+        /// <example>
+        /// <code title="Zoom To Selected" description="Zoom to the map's selected features." region="Zoom To Selected Synchronous" source="..\..\ArcGIS\SharedArcGIS\SDK\Examples\ArcGIS.Desktop.Mapping\MapExploration\MapView_Examples.cs" lang="CS"/>
+        /// </example>
+        #region Zoom To Selected Synchronous
+        public Task<bool> ZoomToSelectedAsync()
+            {
+                return QueuedTask.Run(() =>
+                {
+                    //Get the active map view.
+                    var mapView = MapView.Active;
+                    if (mapView == null)
+                        return false;
+            
+                    //Zoom to the map's selected features.
+                    return mapView.ZoomToSelected();
+                });
+            }
+            #endregion
+
         #endregion
 
         #region Events
 
-        #region RecordCreated Event
+        #region AFCRecordCreated Event
         /// <summary>
-        /// Used to identify when a record
+        /// Used to identify when an AFC record
         /// is created using the Create New
-        /// Record method.
+        /// AFC Record method.
         /// </summary>
-        public event EventHandler<RecordCreatedEventArgs> RecordCreatedEvent;
+        public event EventHandler<AFCRecordCreatedEventArgs> AFCRecordCreatedEvent;
             #endregion
 
         #endregion
@@ -948,18 +1025,18 @@ namespace pro_createrecords_addin
         #endregion
 
 
-        #region Raise Record Created Event
+        #region Raise AFC Record Created Event
 
         /// <summary>
         /// Raise the RecordCreated event.
         /// </summary>
         /// <param name="_afclog"></param>
-        public void RaiseRecordCreatedEvent(AFCLog _afclog)
+        public void RaiseAFCRecordCreatedEvent(AFCLog _afclog)
         {
-            RecordCreatedEventArgs args = new RecordCreatedEventArgs();
+            AFCRecordCreatedEventArgs args = new AFCRecordCreatedEventArgs();
             args.RecordName = _afclog.DOC_NUM;
             args.DateCreated = DateTime.Now;
-            RecordCreatedEvent?.Invoke(_afclog, args);
+            AFCRecordCreatedEvent?.Invoke(_afclog, args);
          }
 
         #endregion
@@ -971,7 +1048,7 @@ namespace pro_createrecords_addin
 
 
 
-    public class RecordCreatedEventArgs
+    public class AFCRecordCreatedEventArgs
     {
         public string RecordName { get; set; }
         public DateTime DateCreated { get; set; } 

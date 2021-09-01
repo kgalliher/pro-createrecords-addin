@@ -105,30 +105,53 @@ namespace pro_createrecords_addin
 
         #region Constants
 
-        private const string _dockPaneID  = "pro_createrecords_addin_CreateRecordsPane";
-        private const string _instance = "DCADSQLVM02";
-        private const string _database = "GEDT";
-        private const AuthenticationMode _authentication = AuthenticationMode.OSA;
-        private const string _version = "dbo.DEFAULT";
-        private const string _afcView = "ADM.AFC_LOG_VW";
-        private const string _yes = "Y";
-        private const string _blank = "";
+        private const string DockPaneID  = "pro_createrecords_addin_CreateRecordsPane";
+
+        private const string Instance = "DCADSQLVM02";
+
+        private const string Database = "GEDT";
+
+        private const AuthenticationMode Authentication = AuthenticationMode.OSA;
+
+        private const string Version = "dbo.DEFAULT";
+
+        private const string AFCView = "ADM.AFC_LOG_VW";
+
+        private const string Yes = "Y";
+
+        private const string Blank = "";
+
         private ObservableCollection<AFCLog> _afclogs = new ObservableCollection<AFCLog>();
-        private ObservableCollection<AFCLog> _records = new ObservableCollection<AFCLog>();
-        private ReadOnlyObservableCollection<AFCLog> _afclogsRO;
+
+        private ReadOnlyObservableCollection<AFCLog> _afcLogsRO;
+
+
+
         private Object _lockObj = new object();
 
-        /**************************************************************************************************
+         /*************************************************************************************************
          * Public ICommand Implementations for Custom WPF Buttons. This allows the application to call    *
          * existing methods in the ViewModel from the button using AsyncRelayCommand.                     *
          * (1) RefreshListCommand - Refreshes the afc log list.                                           *
-         * (2) CreateRecordCommand - Creates a new record based on selected AFC Log information.          *
-         * (3) CreateCleanupRecordCommand - Creates a new parcel fabric records of the cleanup type.      *
+         * (2) CreateCleanupRecordCommand - Creates a new parcel fabric records of the cleanup type.      *
          *     This is a custom record with specific attributes applied automatically when the workflow   *
          *     involves  cleaning up GIS data only and no legal document is triggering a parcel change.   *
          *************************************************************************************************/
+
+        /// <summary>
+        /// Represents a wrapper
+        /// for the refresh list
+        /// command.
+        /// </summary>
         public ICommand RefreshListCommand { get; set; }
 
+
+
+        /// <summary>
+        /// Represents a wrapper
+        /// for the create cleanup
+        /// record command.
+        /// </summary>
         public ICommand CreateCleanupRecordCommand { get; set; }
 
 
@@ -139,6 +162,8 @@ namespace pro_createrecords_addin
             //TODO: Check to ensure that a parcel fabric is
             // included in the current map and that the AFC Log View exists
             // in the geodatabase
+            // Check to ensure that the DCAD tile feature class is in the 
+            // current map
 
 
 
@@ -155,8 +180,8 @@ namespace pro_createrecords_addin
          * a ReadOnlyObservableCollection, hence this approach is used.
          ******************************************************************/
 
-            _afclogsRO = new ReadOnlyObservableCollection<AFCLog>(_afclogs);
-            BindingOperations.EnableCollectionSynchronization(_afclogsRO, _lockObj);
+            _afcLogsRO = new ReadOnlyObservableCollection<AFCLog>(_afclogs);
+            BindingOperations.EnableCollectionSynchronization(_afcLogsRO, _lockObj);
 
 
             // Call SearchForAFCLogs
@@ -171,18 +196,23 @@ namespace pro_createrecords_addin
              * *****************************************************************************/
 
             RefreshListCommand = new AsyncRelayCommand( func => AsyncSearchForAFCLogs());
-            //
-            //CreateCleanupRecord = new AsyncRelayCommand(func => AsyncCreateCleanupRecord());
+
+            CreateCleanupRecordCommand = new AsyncRelayCommand(func => AsyncSearchDCADTiles());
+
 
 
         }
+
+
+
+
 
         /// <summary>
         /// Show the DockPane.
         /// </summary>
         internal static void Show()
         {
-            DockPane pane = FrameworkApplication.DockPaneManager.Find(_dockPaneID);
+            DockPane pane = FrameworkApplication.DockPaneManager.Find(DockPaneID);
             if (pane == null)
                 return;
 
@@ -201,10 +231,11 @@ namespace pro_createrecords_addin
         public ReadOnlyObservableCollection<AFCLog> AFCLogs
         {
 
-            get { return _afclogsRO; }
+            get { return _afcLogsRO; }
 
 
         }
+
 
         /// <summary>
         /// Text shown near the top of the DockPane.
@@ -283,6 +314,37 @@ namespace pro_createrecords_addin
 
         #endregion
 
+        #region Search for DCAD Tiles
+        /// <summary>
+        /// Performs an intersecting
+        /// spatial query on the map
+        /// extent for DCAD tile
+        /// numbers and adds these
+        /// to the panel items
+        /// read only observable
+        /// collection.
+        /// IMPORTANT: The tile layer
+        /// must exist in the current
+        /// map.
+        /// </summary>
+        /// <returns></returns>
+        public async Task AsyncSearchDCADTiles()
+        {
+            /******************************
+             *  Clear AFCLogs and add     *
+             *  Tile Numbers in current   *
+             *  extent                    *
+             *****************************/
+            ClearAFCLogsCollection();
+
+
+
+
+
+        }
+
+        #endregion
+
         #region Search for AFC Logs
 
         /// <summary>
@@ -291,7 +353,7 @@ namespace pro_createrecords_addin
         /// current session, then skip this AFC log and do not add it
         /// to the Create Records Pane collection. 
         /// </summary>
-        public async Task AsyncSearchForAFCLogs(string _searchString = _blank)
+        public async Task AsyncSearchForAFCLogs(string _searchString = Blank)
         {
             if (AFCLogs.Count > 0)
             {
@@ -299,7 +361,7 @@ namespace pro_createrecords_addin
                 {
                     if (afclog.RECORD_CREATED)
                     {
-                        _records.Add(afclog);
+                        _afclogs.Add(afclog);
                     }
                 }
                 ClearAFCLogsCollection();
@@ -309,14 +371,18 @@ namespace pro_createrecords_addin
             await QueuedTask.Run(() =>
             {
                 // Get a list of AFC Logs
+                
                 PopulateAFCLogCollection(_searchString);
 
                 // Search for AFC Logs
+                
                 // and apply search string
+                
                 // if provided
+                
                 IEnumerable<AFCLog> linqResults;
 
-                if (_searchString != _blank)
+                if (_searchString != Blank)
                 {
                     linqResults = _afclogs.Where(afc => afc.DOC_NUM.Contains(_searchString));
 
@@ -327,7 +393,9 @@ namespace pro_createrecords_addin
                 }
 
                     // Create a temporary observable collection
+                    
                     // for filtering
+                    
                     ObservableCollection<AFCLog>_tempafclogs;
 
                     // Filter the items in the existing observable collection
@@ -335,8 +403,11 @@ namespace pro_createrecords_addin
                     _tempafclogs = new ObservableCollection<AFCLog>(linqResults);
 
                     // Compare temporary collection with the original.
+                    
                     // Remove any items from the original collection
+                    
                     // that do not appear in the temporary collection.
+                    
                     for (int i = _afclogs.Count - 1; i >= 0; i--)
                     {
                         var item = _afclogs[i];
@@ -348,12 +419,16 @@ namespace pro_createrecords_addin
                             }
 
                         }
-                    }
+                }
 
                     // Now add any items that are included in
+                    
                     // the temporary collection that are not in
+                    
                     // the original collection in the case of a
+                    
                     // backspace
+                    
                     foreach (var item in _tempafclogs)
                     {
                         if (!_afclogs.Contains(item))
@@ -374,6 +449,7 @@ namespace pro_createrecords_addin
                      * *******************************************/
 
                  // Remove temporary observable collection
+                 
                  _tempafclogs = null;
                 
 
@@ -381,6 +457,7 @@ namespace pro_createrecords_addin
             });
 
             // Call NotifyPropertyChanged and pass in the AFCLogs property
+            
             NotifyPropertyChanged(() => AFCLogs);
 
 
@@ -393,142 +470,179 @@ namespace pro_createrecords_addin
         public async Task PopulateAFCLogCollection(string _searchString)
         {
             // Define columns to be included in
+            
             // query filter
+            
             string _instNum = "INSTRUMENT_NUM";
+            
             string _seqNum = "SEQ_NUM";
+            
             string _afcLogID = "AFC_LOG_ID";
+            
             int _afcCount = 0;
-            string _whereClause = _blank;
+            
+            string _whereClause = Blank;
+            
             bool _acctNumBlank = false;
+            
             int _docNumType = 1;         // Helps the SetForegroundColor method know the color type for DOC_NUM.
+            
             int _acctNumTYpe = 2;        // Helps the SetForegroundColor method know the color type for ACCOUNT_NUM.
 
             // Define where clause based
+            
             // on search string contents
-            if (_searchString != _blank)
+            
+            if (_searchString != Blank)
             {
                 _whereClause = String.Format("{0} LIKE '%{1}%' OR {2} LIKE '%{1}%'", _instNum, _searchString, _seqNum);
             }
 
             // Multi-threaded synchronization
+            
             //private Object _lockObj = new object();
+            
             //BindingOperations.EnableCollectionSynchronization(_afclogsRO, _lockObj);
 
             try
             {
-                await ArcGIS.Desktop.Framework.Threading.Tasks.QueuedTask.Run(() => {
+                await QueuedTask.Run(() => {
 
                     // Opening a Non-Versioned SQL Server instance.
-                    DatabaseConnectionProperties connectionProperties = new DatabaseConnectionProperties(EnterpriseDatabaseType.SQLServer)
+
+
+                    using (Geodatabase geodatabase = new Geodatabase(
+                        CreateNewConnectionPropObj(EnterpriseDatabaseType.SQLServer,
+                        Authentication,
+                        Database,
+                        Instance,
+                        Version)))
                     {
-                        AuthenticationMode = _authentication,
-
-                        // Where testMachine is the machine where the instance is running and testInstance is the name of the SqlServer instance.
-                        Instance = _instance,
-
-                        // Provided that a database called LocalGovernment has been created on the testInstance and geodatabase has been enabled on the database.
-                        Database = _database,
-
-                        // Provided that a login called gdb has been created and corresponding schema has been created with the required permissions.
-                        //User = "gdb",
-                        //Password = "password",
-                        Version = _version
-                    };
-
-
-                    using (Geodatabase geodatabase = new Geodatabase(connectionProperties))
-                    using (Table table = geodatabase.OpenDataset<Table>(_afcView))
-                    {
-
-                        QueryFilter queryFilter = new QueryFilter
-                        {
-                            WhereClause = _whereClause,
-                            SubFields = "*",
-                            PostfixClause = String.Format("ORDER BY {0} ASC", _afcLogID)
-                        };
-
-                        using (RowCursor rowCursor = table.Search(queryFilter, false))
+                        using (Table table = geodatabase.OpenDataset<Table>(AFCView))
                         {
 
-
-                            /* ***********************************
-                             * Search through returned rows from *
-                             * query filter and create a new     *
-                             * AFC Log object and bind to the    *
-                             * AFCLogs observable collection.    *
-                             * ***********************************/
-            while (rowCursor.MoveNext())
+                            QueryFilter queryFilter = new QueryFilter
                             {
-                                using (Row row = rowCursor.Current)
+                                WhereClause = _whereClause,
+
+                                SubFields = "*",
+
+                                PostfixClause = String.Format("ORDER BY {0} ASC", _afcLogID)
+                            };
+
+                            using (RowCursor rowCursor = table.Search(queryFilter, false))
+                            {
+
+
+                                /* ***********************************
+                                 * Search through returned rows from *
+                                 * query filter and create a new     *
+                                 * AFC Log object and bind to the    *
+                                 * AFCLogs observable collection.    *
+                                 * ***********************************/
+                                while (rowCursor.MoveNext())
                                 {
-                                    AFCLog afcLog = new AFCLog();
-
-                                    // Determine AFC NOTE length and truncate if longer than 35 chars
-                                    int _afcNoteLength = Convert.ToString(row["AFC_NOTE"]).Length;
-                                    if (_afcNoteLength > 35) _afcNoteLength = 35;
-
-                                    afcLog.AFC_LOG_ID = Convert.ToInt32(row["AFC_LOG_ID"]);
-                                    afcLog.AFC_STATUS_CD = Convert.ToInt32(row["AFC_STATUS_CD"]);
-                                    afcLog.AFC_TYPE_CD = Convert.ToInt32(row["AFC_TYPE_CD"]);
-                                    afcLog.AFC_YEAR = Convert.ToInt32(row["AFC_YEAR"]);
-                                    afcLog.AFC_NOTE = Convert.ToString(row["AFC_NOTE"]).Substring(0, _afcNoteLength);
-                                    afcLog.TILE_NO = Convert.ToInt32(row["TILE_NO"]);
-                                    afcLog.DRAFTER_EMPL_ID = Convert.ToString(row["DRAFTER_EMPL_ID"]);
-                                    afcLog.DRAFTER_COMP_DT = Convert.ToDateTime(row["DRAFTER_COMP_DT"]);
-                                    afcLog.FILE_DATE = Convert.ToDateTime(row["FILE_DATE"]);
-                                    afcLog.EFFECTIVE_DT = Convert.ToDateTime(row["EFFECTIVE_DT"]);
-                                    afcLog.INSTRUMENT_NUM = Convert.ToString(row["INSTRUMENT_NUM"]);
-                                    afcLog.SEQ_NUM = Convert.ToString(row["SEQ_NUM"]);
-                                    afcLog.RUSH_IND = Convert.ToString(row["RUSH_IND"]) == _yes ? true : false;
-
-                                    // Determine if Account Number is provided
-                                    if (Convert.ToString(row["ACCOUNT_NUM"]).Equals(_blank)) _acctNumBlank = true;
-                                    if (!_acctNumBlank) afcLog.ACCOUNT_NUM = Convert.ToString(row["ACCOUNT_NUM"]);
-
-                                    //afcLog.ACCT_LIST = Convert.ToString(row["ACCT_LIST"]);
-                                    afcLog.DOC_TYPE = Convert.ToString(row["DOC_TYPE"]);
-                                    afcLog.SetImageSource();    // Method sets the image source for the afc log type
-                                    afcLog.SetDocumentNumber(); // Method sets the document number for the afc log type
-                                    afcLog.SetRecordType();     // Method sets the record type for the afc log
-
-                                    // Set the record status based on
-                                    // the AFC status code
-                                    afcLog.SetRecordStatus();   // Method that sets the record status for the afc log
-
-                                    /***************************************
-                                    * Subscribe to RecordCreated Event in *
-                                    * the AFCLog class.                   *
-                                    * ************************************/
-                                    afcLog.RecordCreatedEvent += OnRecordCreated;
-
-                                    /***********************************************
-                                    * Set the foreground color for the document    *
-                                    * and account number properties based on the   *
-                                    * RUSH_IND (if yes == RED else Black/Gray      *
-                                    * *********************************************/
-                                    afcLog.SetForegroundColor(_docNumType);
-                                    afcLog.SetForegroundColor(_acctNumTYpe);
-
-                                    _afcCount += 1;             // Increment afc count variable
-                                    // Reads and Writes should be made from within the lock
-                                    lock (_lockObj)
+                                    using (Row row = rowCursor.Current)
                                     {
-                                        _afclogs.Add(afcLog);
+                                        AFCLog afcLog = new AFCLog();
+
+                                        // Determine AFC NOTE length and truncate if longer than 35 chars
+
+                                        int _afcNoteLength = Convert.ToString(row["AFC_NOTE"]).Length;
+
+                                        if (_afcNoteLength > 35) _afcNoteLength = 35;
+
+                                        afcLog.AFC_LOG_ID = Convert.ToInt32(row["AFC_LOG_ID"]);
+
+                                        afcLog.AFC_STATUS_CD = Convert.ToInt32(row["AFC_STATUS_CD"]);
+
+                                        afcLog.AFC_TYPE_CD = Convert.ToInt32(row["AFC_TYPE_CD"]);
+
+                                        afcLog.AFC_YEAR = Convert.ToInt32(row["AFC_YEAR"]);
+
+                                        afcLog.AFC_NOTE = Convert.ToString(row["AFC_NOTE"]).Substring(0, _afcNoteLength);
+
+                                        afcLog.TILE_NO = Convert.ToInt32(row["TILE_NO"]);
+
+                                        afcLog.DRAFTER_EMPL_ID = Convert.ToString(row["DRAFTER_EMPL_ID"]);
+
+                                        afcLog.DRAFTER_COMP_DT = Convert.ToDateTime(row["DRAFTER_COMP_DT"]);
+
+                                        afcLog.FILE_DATE = Convert.ToDateTime(row["FILE_DATE"]);
+
+                                        afcLog.EFFECTIVE_DT = Convert.ToDateTime(row["EFFECTIVE_DT"]);
+
+                                        afcLog.INSTRUMENT_NUM = Convert.ToString(row["INSTRUMENT_NUM"]);
+
+                                        afcLog.SEQ_NUM = Convert.ToString(row["SEQ_NUM"]);
+
+                                        afcLog.RUSH_IND = Convert.ToString(row["RUSH_IND"]) == Yes ? true : false;
+
+                                        // Determine if Account Number is provided
+
+                                        if (Convert.ToString(row["ACCOUNT_NUM"]).Equals(Blank)) _acctNumBlank = true;
+
+                                        if (!_acctNumBlank) afcLog.ACCOUNT_NUM = Convert.ToString(row["ACCOUNT_NUM"]);
+
+                                        //afcLog.ACCT_LIST = Convert.ToString(row["ACCT_LIST"]);
+
+                                        afcLog.DOC_TYPE = Convert.ToString(row["DOC_TYPE"]);
+
+                                        afcLog.SetImageSource();    // Method sets the image source for the afc log type
+
+                                        afcLog.SetDocumentNumber(); // Method sets the document number for the afc log type
+
+                                        afcLog.SetRecordType();     // Method sets the record type for the afc log
+
+                                        // Set the record status based on
+
+                                        // the AFC status code
+
+                                        afcLog.SetRecordStatus();   // Method that sets the record status for the afc log
+
+                                        /***************************************
+                                        * Subscribe to AFCRecordCreated Event  *
+                                        * in the AFCRecord class.              *
+                                        * *********************************** */
+
+                                        afcLog.AFCRecordCreatedEvent += OnAFCRecordCreated;
+
+                                        /***********************************************
+                                        * Set the foreground color for the document    *
+                                        * and account number properties based on the   *
+                                        * RUSH_IND (if yes == RED else Black/Gray      *
+                                        * *********************************************/
+
+                                        afcLog.SetForegroundColor(_docNumType);
+
+                                        afcLog.SetForegroundColor(_acctNumTYpe);
+
+                                        _afcCount += 1;             // Increment afc count variable
+
+                                        // Reads and Writes should be made from within the lock
+
+                                        lock (_lockObj)
+                                        {
+                                            _afclogs.Add(afcLog);
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-
                     // If completed, add psuedo afc log if count is zero
+                    
                     AddEmptyListAFCLog(_afcCount);
                 });
             }
             catch (GeodatabaseFieldException fieldException)
             {
                 // One of the fields in the where clause might not exist. 
+                
                 // There are multiple ways this can be handled:
+                
                 // Handle error appropriately
+                
                 ErrorLogs.WriteLogEntry("Create Records Add-In: Populate AFC Log Collection", fieldException.Message, System.Diagnostics.EventLogEntryType.Error);
             }
             catch (Exception exception)
@@ -536,8 +650,6 @@ namespace pro_createrecords_addin
                 ErrorLogs.WriteLogEntry("Create Records Add-In: Populate AFC Log Collection", exception.Message, System.Diagnostics.EventLogEntryType.Error);
             }
         }
-
-
 
         /// <summary>
         /// When a record is created, the dock pane should
@@ -550,7 +662,7 @@ namespace pro_createrecords_addin
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void OnRecordCreated(object sender, RecordCreatedEventArgs e)
+        private void OnAFCRecordCreated(object sender, AFCRecordCreatedEventArgs e)
         {
             try
             {
@@ -561,7 +673,7 @@ namespace pro_createrecords_addin
             catch (Exception exception)
             {
 
-                ErrorLogs.WriteLogEntry("Create Records Add-In: OnRecordCreated Event Handler", exception.Message, System.Diagnostics.EventLogEntryType.Error);
+                ErrorLogs.WriteLogEntry("Create Records Add-In: OnAFCRecordCreated Event Handler", exception.Message, System.Diagnostics.EventLogEntryType.Error);
             }
 
         }
@@ -583,7 +695,7 @@ namespace pro_createrecords_addin
                     * *********************************************
                     * Displays a default afc log row in the       *
                     * observable collection. See details in       *
-                    * the AFCLog class.                           *
+                    * the CleanupRecord class.                           *
                     * This type of afc log is not valid, but just *
                     * displays an empty marker with message.      *
                     **********************************************/
@@ -591,10 +703,15 @@ namespace pro_createrecords_addin
                     if (_afcCount == 0)
                     {
                         AFCLog afcLog = new AFCLog();
+                        
                         afcLog.AFC_LOG_ID = 1;
+                        
                         afcLog.AFC_STATUS_CD = 99;
+                        
                         afcLog.VALID_AFC_LOG = false;
+
                         afcLog.SetImageSource();
+
                         afcLog.SetDocumentNumber();
 
 
@@ -606,18 +723,52 @@ namespace pro_createrecords_addin
                 
                     }
         
-                    /***************************************
-                     * Disable the create record button    *
-                     * for this type of entry.             *
-                     * ************************************/
-                     
         
                 }
         #endregion
 
+        #region Create New Connection Properties Object
 
+        /// <summary>
+        /// Creates a new connection
+        /// properties object
+        /// from defined parameters
+        /// for the enterprise
+        /// database connection.
+        /// </summary>
+        /// <param name="dbms"></param>
+        /// <param name="auth"></param>
+        /// <param name="db"></param>
+        /// <param name="instance"></param>
+        /// <param name="version"></param>
+        /// <returns></returns>
+        public DatabaseConnectionProperties CreateNewConnectionPropObj(
+                        EnterpriseDatabaseType dbms,
+                        AuthenticationMode auth,
+                        string db,
+                        string instance,
+                        string version)
+        {
+            DatabaseConnectionProperties connectionProperties =
+                new DatabaseConnectionProperties(dbms)
+                {
+                    AuthenticationMode = auth,
+
+                    Database = db,
+
+                    Instance = instance,
+
+                    Version = version
+                };
+
+            return connectionProperties;
+        }
 
         #endregion
+
+        #endregion
+
+
 
 
 
