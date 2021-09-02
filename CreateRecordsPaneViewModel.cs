@@ -95,7 +95,8 @@ using System.Collections.ObjectModel;
 using System.Windows.Data;
 using System.Windows.Input;
 using Microsoft.Toolkit.Mvvm.Input;
-using System.Windows.Media;
+using ArcGIS.Desktop.Mapping;
+using System.Windows;
 
 namespace pro_createrecords_addin
 {
@@ -121,11 +122,13 @@ namespace pro_createrecords_addin
 
         private const string Blank = "";
 
+        private const string TileLayerName = "DCAD Tiles";
+
         private ObservableCollection<AFCLog> _afclogs = new ObservableCollection<AFCLog>();
 
         private ReadOnlyObservableCollection<AFCLog> _afcLogsRO;
 
-
+        private MapView _mapView;
 
         private Object _lockObj = new object();
 
@@ -181,12 +184,14 @@ namespace pro_createrecords_addin
          ******************************************************************/
 
             _afcLogsRO = new ReadOnlyObservableCollection<AFCLog>(_afclogs);
+
             BindingOperations.EnableCollectionSynchronization(_afcLogsRO, _lockObj);
 
 
             // Call SearchForAFCLogs
+            
             AsyncSearchForAFCLogs();
-            //DisplayTestMessage();
+
 
             /*******************************************************************************
              * Hook RefreshList and CreateCleanupRecord commands                           *
@@ -199,8 +204,32 @@ namespace pro_createrecords_addin
 
             CreateCleanupRecordCommand = new AsyncRelayCommand(func => AsyncSearchDCADTiles());
 
+            /**********************************************************************************
+             * Sets the active MapView and determines if it is null                           *
+             * If null, then an error message is sent to the event log.                       *
+             * *******************************************************************************/
 
+            try
+            {
+                _mapView = MapView.Active;
 
+                if (_mapView is null)
+                {
+
+                    throw new NullReferenceException("The active map view could not be accessed. Verify that a map view is active and try again.");
+
+                }
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                ErrorLogs.WriteLogEntry("Create Records Add In: Error Accessing Active Map View", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+
+            }
+            
         }
 
 
@@ -265,6 +294,7 @@ namespace pro_createrecords_addin
                 SetProperty(ref _searchString, value, () => SearchString);
 
                 //Call SearchForAFCLogs
+                
                 AsyncSearchForAFCLogs(_searchString);
 
 
@@ -333,11 +363,11 @@ namespace pro_createrecords_addin
             /******************************
              *  Clear AFCLogs and add     *
              *  Tile Numbers in current   *
-             *  extent                    *
+             *  extent to dockpane        *
              *****************************/
-            ClearAFCLogsCollection();
+            await AsyncSearchForAFCLogs(_searchString, true);
 
-
+            
 
 
 
@@ -353,26 +383,38 @@ namespace pro_createrecords_addin
         /// current session, then skip this AFC log and do not add it
         /// to the Create Records Pane collection. 
         /// </summary>
-        public async Task AsyncSearchForAFCLogs(string _searchString = Blank)
+        public async Task AsyncSearchForAFCLogs(string _searchString = Blank, bool _cleanupRecord = false)
         {
             if (AFCLogs.Count > 0)
             {
-                foreach (var afclog in AFCLogs)
-                {
-                    if (afclog.RECORD_CREATED)
-                    {
-                        _afclogs.Add(afclog);
-                    }
-                }
+
                 ClearAFCLogsCollection();
 
             }
 
-            await QueuedTask.Run(() =>
+            await QueuedTask.Run(async () =>
             {
-                // Get a list of AFC Logs
-                
-                PopulateAFCLogCollection(_searchString);
+                /************************************************************************
+                 * Get a list of AFC Logs                                               *
+                 * **********************************************************************
+                 * If a cleanup record is requested, this will return tiles that could  *
+                 * be used to create a cleanup record instead of an AFC log.            *
+                 * *********************************************************************/
+
+                if (_cleanupRecord)
+                {
+
+                    await SearchingAFeatureLayer(_mapView);
+
+                }
+
+                else
+                {
+
+                    await PopulateAFCLogCollection (_searchString);
+
+                }
+
 
                 // Search for AFC Logs
                 
@@ -389,7 +431,7 @@ namespace pro_createrecords_addin
                 }
                 else
                 {
-                    linqResults = _afclogs.Where(afc => afc.AFC_LOG_ID > 0);
+                    linqResults = _afclogs.Where(afc => afc.AFC_LOG_ID >= 0);
                 }
 
                     // Create a temporary observable collection
@@ -467,6 +509,15 @@ namespace pro_createrecords_addin
 
         #region Populates AFCLog Collection
 
+        /// <summary>
+        /// Pulls data from the view retrieving
+        /// AFC logs from the Mars database and
+        /// puts them into an AFC Log collection
+        /// for binding to the dock pane.
+        /// </summary>
+        /// <param name="_searchString">A set of characters used to filter
+        /// the current AFC logs assigned to the authenticated user.</param>
+        /// <returns></returns>
         public async Task PopulateAFCLogCollection(string _searchString)
         {
             // Define columns to be included in
@@ -509,14 +560,12 @@ namespace pro_createrecords_addin
                 await QueuedTask.Run(() => {
 
                     // Opening a Non-Versioned SQL Server instance.
-
+                    DatabaseConnectionProperties connectionProperties =
+                    CreateNewConnectionPropObj(EnterpriseDatabaseType.SQLServer, 
+                    Authentication, Database, Instance, Version);
 
                     using (Geodatabase geodatabase = new Geodatabase(
-                        CreateNewConnectionPropObj(EnterpriseDatabaseType.SQLServer,
-                        Authentication,
-                        Database,
-                        Instance,
-                        Version)))
+                        connectionProperties))
                     {
                         using (Table table = geodatabase.OpenDataset<Table>(AFCView))
                         {
@@ -736,11 +785,11 @@ namespace pro_createrecords_addin
         /// for the enterprise
         /// database connection.
         /// </summary>
-        /// <param name="dbms"></param>
-        /// <param name="auth"></param>
-        /// <param name="db"></param>
-        /// <param name="instance"></param>
-        /// <param name="version"></param>
+        /// <param name="dbms">The RDBMS type (e.g., SQL Server, PostgresSQL, etc.).</param>
+        /// <param name="auth">The authentication mode (e.g., OSA or Database).</param>
+        /// <param name="db">The name of the database. </param>
+        /// <param name="instance">The name of the database server instance.</param>
+        /// <param name="version">The name of the geodatabase version.</param>
         /// <returns></returns>
         public DatabaseConnectionProperties CreateNewConnectionPropObj(
                         EnterpriseDatabaseType dbms,
@@ -768,6 +817,119 @@ namespace pro_createrecords_addin
 
         #endregion
 
+        #region Searching a Feature Layer using SpatialQueryFilter
+
+        /// <summary>
+        /// Searches for DCAD tiles within
+        /// the active MapView's extent and
+        /// displays them in the dockpane.
+        /// </summary>
+        /// <param name="mapView">The active MapView.</param>
+        /// <returns></returns>
+        public async Task SearchingAFeatureLayer(MapView mapView)
+        {
+
+            // Feature Layer Variables
+            string _tileNumField = "Number";                 // Tile Number field name
+            string _cleanupRecordType = "CLEANUP RECORD";    // Defines the record type
+            int _afcTypeCd = 4;                              // Not a legal change AFC Type code
+            int _afcCount = 0;                               // Counter for total tiles added to pane
+
+
+            // This returns a collection of layers of the "name" specified.
+
+            // You can use any Linq expression to query the collection.  
+
+            var lyrExists = MapManagement.ConfirmTOCLayer(TileLayerName);
+
+
+            // If the tile layer exists
+            // then create a spatial filter
+            // to query the layer
+            if (lyrExists)
+            {
+
+                await QueuedTask.Run(() => {
+
+                    // Access tile layer
+                    FeatureLayer dcadTileLayer = MapView.Active.Map.GetLayersAsFlattenedList()
+                               .OfType<FeatureLayer>().Where(f => f.Name == TileLayerName).FirstOrDefault();
+
+                        // Using a spatial query filter to find all features
+
+                        // which intersect the current map extent.
+
+                        SpatialQueryFilter spatialQueryFilter = new SpatialQueryFilter
+                        {
+                            
+                            FilterGeometry = mapView.Extent,
+
+                            SpatialRelationship = SpatialRelationship.Intersects
+
+                        };
+
+                        using (RowCursor tileCursor = dcadTileLayer.GetFeatureClass().Search(spatialQueryFilter, false))
+                        {
+                            
+                        while (tileCursor.MoveNext())
+                            {
+                        
+                            using (Feature feature = (Feature)tileCursor.Current)
+                                {
+                                    // Add the tile name to the AFC logs
+                                    
+                                    // observable collection
+                                    
+                                    AFCLog afcLog = new AFCLog();
+
+                                    afcLog.AFC_TYPE_CD = _afcTypeCd;
+                                    
+                                    afcLog.TILE_NO = Convert.ToInt32(feature[_tileNumField]);
+
+                                    afcLog.DRAFTER_EMPL_ID = AFCLog.GetCurrentUser();
+
+                                    afcLog.DOC_TYPE = _cleanupRecordType;
+                                    
+                                    afcLog.SetImageSource();    // Method sets the image source for the afc log type
+                                    
+                                    afcLog.SetDocumentNumber(); // Method sets the document number for the afc log type
+                                    
+                                    afcLog.SetRecordType();     // Method sets the record type for the afc log
+                                    
+                                    // Set the record status based on
+                                    
+                                    // the AFC status code
+                                    
+                                    afcLog.SetRecordStatus();   // Method that sets the record status for the afc log
+                                    
+                                    /***************************************
+                                    * Subscribe to AFCRecordCreated Event  *
+                                    * in the AFCRecord class.              *
+                                    * *********************************** */
+                                    
+                                    afcLog.AFCRecordCreatedEvent += OnAFCRecordCreated;
+                                    
+                                    _afcCount += 1;             // Increment afc count variable
+                                    
+                                    // Reads and Writes should be made from within the lock
+                                    
+                                    lock (_lockObj)
+                                    {
+                                        _afclogs.Add(afcLog);
+                                    }
+                                }
+                            }
+                        }
+                });
+            }
+            else
+            {
+                MessageBox.Show($"The layer {TileLayerName} does not exist in the map. " +
+                                $"Please check your layers and try again.");
+            }
+        }
+
+        #endregion Searching a Feature Layer using SpatialQueryFilter
 
 
 

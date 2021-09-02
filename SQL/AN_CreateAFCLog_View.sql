@@ -61,12 +61,13 @@ SELECT  AFC.AFC_LOG_ID
 	    /**************************************
 	    *   Make sure the appropriate path    *
 		*   to the mars database is supplied  *
+		*   (e.g., GSDVSQL01.DBPROD.DBO..)    *
 	    **************************************/
-	   FROM DBPROD.DBO.AFC_LOG AFC  
+	   FROM GSDVSQL01.DBPROD.DBO.AFC_LOG AFC  
 
 	   INNER JOIN
 
-	   DBPROD.DBO.DEED_MAIN DEED
+	   GSDVSQL01.DBPROD.DBO.DEED_MAIN DEED
 
 	   ON AFC.INSTRUMENT_NUM = DEED.INSTRUMENT_NUM
 	   
@@ -81,7 +82,7 @@ SELECT  AFC.AFC_LOG_ID
 	   * the database view                 *
 	   ************************************/
 
-	   ADM.PARCELFABRIC_STAGING_RECORDS R
+	   ADM.PARCELFABRIC_RECORDS R
 
 	   ON AFC.INSTRUMENT_NUM      = R.NAME OR
 	      AFC.SEQ_NUM             = RIGHT(R.NAME, 7)

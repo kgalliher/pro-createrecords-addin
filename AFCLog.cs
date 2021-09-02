@@ -112,6 +112,7 @@ using Microsoft.Toolkit.Mvvm.Input;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -131,6 +132,7 @@ namespace pro_createrecords_addin
         private const char BACK_SLASH = '\\';
         private const string BLANK = "";
         private const string NO_ACCT_NUM = "NO ACCOUNT NUMBER";
+        private const int NOT_A_LEGAL_CHANGE = 4;
 
         #region Deed Types
         /* DEED TYPES *****************************************************/
@@ -160,6 +162,7 @@ namespace pro_createrecords_addin
         private const string TRS = "TRUSTEE'S/SUBSTITUTE TRUSTEE'S DEED";
         private const string WAD = "WARRANTY DEED";
         private const string WD2 = "WD (AKA WARRANTY DEED)";
+        private const string CLP = "CLEANUP RECORD";         // Not a true deed type. For cleanup records only.
         #endregion
 
         #endregion
@@ -230,14 +233,15 @@ namespace pro_createrecords_addin
             _recordType = 0;
             _recordStatus = 0;
             _validafclog = true;
+            _msgClrDocNum = Color.FromRgb(0, 0, 0); ;
+            _msgClrAcctNum = Color.FromRgb(128, 128, 128);
 
-
-             /******************************************************************************
-             * Hook CreateRecord commands                                                  *
-             * The AsyncRelayCommand is part of the Microsoft.Toolkit.Mvvm.Input namespace *
-             * and allows developers to pass class methods to ICommand implementations to  *
-             * be called from custom button controls on the xaml UI.                       *
-             * ****************************************************************************/
+            /******************************************************************************
+            * Hook CreateRecord commands                                                  *
+            * The AsyncRelayCommand is part of the Microsoft.Toolkit.Mvvm.Input namespace *
+            * and allows developers to pass class methods to ICommand implementations to  *
+            * be called from custom button controls on the xaml UI.                       *
+            * ****************************************************************************/
 
             CreateRecordCommand = new AsyncRelayCommand(func => AsyncCreateNewAFCRecord(), () => this.VALID_AFC_LOG);
 
@@ -616,7 +620,11 @@ namespace pro_createrecords_addin
                     case 3:                                     // Research
                         _docNum = String.Format("{0}-{1}",_afcYear.ToString(), _seqNum);
                         break;
-            
+
+                    case 4:                                     // Not a Legal Change
+                        _docNum = String.Format("Tile: {0}", _tileNo.ToString());
+                        break;
+
                     default:                                    // Not provided
                         _docNum = "Assign an AFC log...";
                         break;
@@ -736,6 +744,10 @@ namespace pro_createrecords_addin
                     case WD2:
                         _recordType = 26;
                         break;
+
+                    case CLP:
+                        _recordType = 28;
+                        break;
             
                     default:
                         break;
@@ -772,9 +784,10 @@ namespace pro_createrecords_addin
         /// the property type and if the
         /// AFC log is marked as a rush.
         /// </summary>
-        /// <param name="_foregroundType"></param>
+        /// <param name="_foregroundType">Is an optional parameter and defaults to 
+        /// the instrument document number type = 1.</param>
         /// <returns></returns>
-        public void SetForegroundColor(int _foregroundType)
+        public void SetForegroundColor(int _foregroundType = 1)
             {
 
             /**********************************************
@@ -847,72 +860,162 @@ namespace pro_createrecords_addin
         public async Task AsyncCreateNewAFCRecord()
         {
 
+            bool _cleanupRecordExists = false;    // Boolean variable indicating if a cleanup record exists
+
+
+
             try
             {
 
+                // Determine the AFC type.
+
+                // If the type indicates that
+
+                // a cleanup record is being created
+
+                // then some features will be different
+
+                if (_afcTypeCd == NOT_A_LEGAL_CHANGE)
+                {
+
+                    _cleanupRecordExists = CheckCleanupRecordExists(this).Result;
+
+
+                }
+
+
                 // Pass in record name, record type, afctype, 
+
                 // recorded date, effective date, and record status
-                string _name = this.DOC_NUM;
-                string _afcNote = this.AFC_NOTE;
-                int _recordType = this.RECORD_TYPE;
-                int _afcType = this.AFC_TYPE_CD;
-                DateTime _recordedDate = this.FILE_DATE;
-                DateTime _effectiveDate = this.EFFECTIVE_DT;
-                int _recordStatus = this.RECORD_STATUS;
+
+                string _name = DOC_NUM;
+
+                string _afcNote = AFC_NOTE;
+
+                string _tileNum = TILE_NO.ToString();
+
+                int _recordType = RECORD_TYPE;
+
+                int _afcType = AFC_TYPE_CD;
+
+                DateTime _recordedDate = FILE_DATE;
+
+                DateTime _effectiveDate = EFFECTIVE_DT;
+
+                int _recordStatus = RECORD_STATUS;
 
 
-                string errorMessage = await QueuedTask.Run(async () =>
+
+
+                if (!_cleanupRecordExists)
                 {
-                    Dictionary<string, object> RecordAttributes = new Dictionary<string, object>();
 
-                    try
+                    string errorMessage = await QueuedTask.Run(async () =>
                     {
-                        var myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
-                        //if there is no fabric in the map then bail
-                        if (myParcelFabricLayer == null)
-                            return "There is no fabric in the map.";
-                        var recordsLayer = await myParcelFabricLayer.GetRecordsLayerAsync();
-                        var editOper = new EditOperation()
+                        Dictionary<string, object> RecordAttributes = new Dictionary<string, object>();
+
+                        try
                         {
-                            Name = "Create Parcel Fabric Record",
-                            ProgressMessage = "Create Parcel Fabric Record...",
-                            ShowModalMessageAfterFailure = true,
-                            SelectNewFeatures = false,
-                            SelectModifiedFeatures = false
-                        };
 
-                         /**********************************************
-                         * Assign local variables to record attributes *
-                         * ********************************************/
-                        RecordAttributes.Add("Name", _name);
-                        RecordAttributes.Add("RecordType", _recordType);
-                        RecordAttributes.Add("RecordedDate", _recordedDate);
-                        RecordAttributes.Add("EffectiveDate", _effectiveDate);
-                        RecordAttributes.Add("AFCType", _afcType);
-                        RecordAttributes.Add("RecordStatus", _recordStatus);
+                            var myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
 
-                        var editRowToken = editOper.CreateEx(recordsLayer.FirstOrDefault(), RecordAttributes);
-                        if (!editOper.Execute())
-                            return editOper.ErrorMessage;
+                            //if there is no fabric in the map then bail
 
-                        var defOID = -1;
-                        var lOid = editRowToken.ObjectID.HasValue ? editRowToken.ObjectID.Value : defOID;
-                        await myParcelFabricLayer.SetActiveRecordAsync(lOid);
-                    }
-                    catch (Exception ex)
+                            if (myParcelFabricLayer == null)
+                            {
+
+                                return "There is no fabric in the map.";
+
+                            }
+
+                            IEnumerable<FeatureLayer> recordsLayer = await myParcelFabricLayer.GetRecordsLayerAsync();
+
+                            EditOperation editOper = new EditOperation()
+
+                            {
+
+                                Name = "Create Parcel Fabric Record",
+
+                                ProgressMessage = "Create Parcel Fabric Record...",
+
+                                ShowModalMessageAfterFailure = true,
+
+                                SelectNewFeatures = false,
+
+                                SelectModifiedFeatures = false
+                            };
+
+                            /**********************************************
+                            * Assign local variables to record attributes *
+                            * ********************************************/
+
+                            RecordAttributes.Add("Name", _name);
+
+                            RecordAttributes.Add("RecordType", _recordType);
+
+                            RecordAttributes.Add("RecordedDate", _recordedDate);
+
+                            RecordAttributes.Add("EffectiveDate", _effectiveDate);
+
+                            RecordAttributes.Add("AFCType", _afcType);
+
+                            RecordAttributes.Add("RecordStatus", _recordStatus);
+
+                            RowToken editRowToken = editOper.CreateEx(recordsLayer.FirstOrDefault(), RecordAttributes);
+
+                            if (!editOper.Execute())
+                            {
+
+                                return editOper.ErrorMessage;
+
+                            }
+
+                            int defOID = -1;
+
+                            long lOid = editRowToken.ObjectID.HasValue ? editRowToken.ObjectID.Value : defOID;
+
+                            await myParcelFabricLayer.SetActiveRecordAsync(lOid);
+                        }
+
+                        catch (Exception ex)
+
+                        {
+
+                            return ex.Message;
+
+                        }
+
+                        return "";
+                    });
+
+                    if (!string.IsNullOrEmpty(errorMessage))
+
                     {
-                        return ex.Message;
+
+                        ErrorLogs.WriteLogEntry("Create New Record Add-In: Create New AFC Record", errorMessage, System.Diagnostics.EventLogEntryType.Error);
+
                     }
-                    return "";
-                });
-                if (!string.IsNullOrEmpty(errorMessage))
-                {
-                    ErrorLogs.WriteLogEntry("Create New Record Add-In: Create New AFC Record", errorMessage, System.Diagnostics.EventLogEntryType.Error);
+                    else if (_afcTypeCd == NOT_A_LEGAL_CHANGE)
+
+                    {
+
+                        MessageBox.Show(String.Format("Created Cleanup Record: {0} for Tile {1}.", _name, _tileNum));
+
+                    }
+
+                    else
+
+                    {
+
+                        MessageBox.Show(String.Format("Created AFC Record: {0} - {1}.", _name, _afcNote));
+
+                    }
+
+
+
+
                 }
-                else
-                {
-                    MessageBox.Show(String.Format("Created AFC Record: {0} - {1}.", _name, _afcNote));
-                }
+
 
                 
             }
@@ -944,7 +1047,256 @@ namespace pro_createrecords_addin
         #endregion
 
 
+        #region Create Cleanup Record Name
 
+        /// <summary>
+        /// Creates a cleanup record name for
+        /// the selected tile number and 
+        /// the current date. See the Cleanup Project ID
+        /// top under the Integration
+        /// heading in the readme document. An example would be C17420220522.
+        /// </summary>
+        /// <param name="afclog">An AFCLog object with tile number and 
+        /// other properties that will be used to create a cleanup
+        /// record.</param>
+        /// <returns></returns>
+        public string CreateCleanupRecordName(AFCLog afclog)
+        {
+
+            // Variables to create
+
+            // cleanup record name
+            
+            string _prefix = "C";
+            string _fourDigitYear = "yyyy";
+            string _twoDigitMonth = "MM";
+            string _twoDigitDay = "dd";
+
+
+            /******************************************************************************
+             * Although the effective date property is used here, it is merely a          *
+             * convenience. A cleanup record should have the current date and             *
+             * since this type of AFC log only has the default current date in the        *
+             * effective date column, this will be sufficient                             *
+             * ***************************************************************************/
+            
+            string _effYear = afclog.EFFECTIVE_DT.ToString(_fourDigitYear);
+            
+            string _effMonth = afclog.EFFECTIVE_DT.ToString(_twoDigitMonth);
+            
+            string _effDay = afclog.EFFECTIVE_DT.ToString(_twoDigitDay);
+            
+            string _tileNum = afclog.TILE_NO.ToString();
+
+            // Create cleanup record name
+
+            // with stringbuilder
+
+            StringBuilder _tileName = new StringBuilder();
+
+            _tileName.Append(_prefix);                   // The letter C prefix
+
+            _tileName.Append(_tileNum);                  // The tile number
+
+            _tileName.Append(_effYear);                  // The current four digit year
+
+            _tileName.Append(_effMonth);                 // The current two digit month
+
+            _tileName.Append(_effDay);                   // The current two digit day
+
+            return _tileName.ToString();
+
+        }
+
+        #endregion
+
+        #region Check if Cleanup Record Already Exists
+
+        /// <summary>
+        /// Checks if the cleanup
+        /// record already exists.
+        /// If it does, then the active
+        /// record is set, otherwise this
+        /// returns true for the cleanup
+        /// record to be created.
+        /// </summary>
+        /// <param name="afclog">An AFC log object having
+        /// the tile number and other necessary properties
+        /// to create the cleanup record. </param>
+        /// <returns></returns>
+        public Task<bool> CheckCleanupRecordExists(AFCLog afclog)
+        {
+            bool bRecordExists = false;
+
+            // Create the cleanup
+
+            // record name
+            string recordName = CreateCleanupRecordName(afclog);
+
+            return QueuedTask.Run(() =>
+            {
+                try { 
+
+
+                // Create a new cleanup record name
+                
+                // and assign to the afclog DOC_NUM
+                
+                // property
+                
+                string _cleanupRecordName = CreateCleanupRecordName(afclog);
+                
+                DOC_NUM = _cleanupRecordName;
+                
+                // If the record already exists
+                
+                // return true. It will be set
+                
+                // as the active record in the
+                
+                // create record method.
+                
+                var myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
+                
+                // if there is no fabric in the map then bail
+                
+                if (myParcelFabricLayer == null)
+                
+                    MessageBox.Show("There is no fabric in the map.", "Search Record Name", MessageBoxButton.OK);
+                
+                /**********************************************************************
+                 * Search for the cleanup record. If it exists, then set it as the    *
+                 * active record, otherwise, return a false boolean value indicating  *
+                 * that the record does not exist.                                    *
+                 * *******************************************************************/
+                
+                ParcelRecord theCleanupRecord = myParcelFabricLayer.GetRecordAsync(recordName).Result;
+                
+                if (theCleanupRecord == null)
+                {
+                    bRecordExists = false;
+                    MessageBox.Show($"The cleanup record {recordName} does not exist. " +
+                           $"You may proceed to create the new record.", "Search Record Name", MessageBoxButton.OK);
+                
+                }
+                
+                else
+                
+                {
+                
+                    var bSetActiveRecord = myParcelFabricLayer.SetActiveRecordAsync(recordName);
+                
+                    if (!bSetActiveRecord.Result)
+                        MessageBox.Show($"There was a problem setting the record {recordName} as active.",
+                            "Search Record Name", MessageBoxButton.OK);
+                
+                    MessageBox.Show($"The cleanup record {recordName} already exists. "
+                            + $"Setting as the active record...", "Search Record Name", MessageBoxButton.OK);
+                
+                        }
+                
+                    }       
+                
+                    catch (Exception ex)
+                
+                    {
+                
+                        ErrorLogs.WriteLogEntry("Create Records Add In: Search Record Name", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                
+                    }
+
+                return bRecordExists;
+
+            });
+
+
+
+
+
+
+        }
+
+        #endregion
+
+        #region Search for Parcel Fabric Record Name
+
+        /// <summary>
+        /// Searches for the record
+        /// name in the records
+        /// feature layer. If found,
+        /// the record passed in as the parameter
+        /// will be set as the active record. Otherwise,
+        /// task will return true for OK to create record.
+        /// </summary>
+        /// <param name="recordName">The name of the cleanup
+        /// record. </param>
+        /// <returns></returns>
+        public Task<bool> SearchRecordName(string recordName)
+        {
+            bool bRecordExists = true;               // Assume that the record exists
+
+            return QueuedTask.Run(async () =>
+            {
+                try
+                {
+                    var myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
+
+                    // if there is no fabric in the map then bail
+
+                    if (myParcelFabricLayer == null)
+
+                        MessageBox.Show("There is no fabric in the map.","Search Record Name",MessageBoxButton.OK);
+
+                    /**********************************************************************
+                     * Search for the cleanup record. If it exists, then set it as the    *
+                     * active record, otherwise, return a false boolean value indicating  *
+                     * that the record does not exist.                                    *
+                     * *******************************************************************/
+
+                    ParcelRecord theCleanupRecord = await myParcelFabricLayer.GetRecordAsync(recordName);
+
+                    if (theCleanupRecord == null)
+                    {
+                        bRecordExists = false;
+                        MessageBox.Show($"The cleanup record {recordName} does not exist. " +
+                               $"You may proceed to create the new record.","Search Record Name",MessageBoxButton.OK);
+
+                    }
+
+                    else
+
+                    {
+
+                        var bSetActiveRecord = await myParcelFabricLayer.SetActiveRecordAsync(recordName);
+
+                        if (!bSetActiveRecord)
+                            MessageBox.Show($"There was a problem setting the record {recordName} as active.", 
+                                "Search Record Name", MessageBoxButton.OK);
+
+                        MessageBox.Show($"The cleanup record {recordName} already exists. " 
+                                + $"Setting as the active record...", "Search Record Name", MessageBoxButton.OK);
+
+                    }
+
+                }
+
+                catch (Exception ex)
+
+                {
+
+                    ErrorLogs.WriteLogEntry("Create Records Add In: Search Record Name", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+
+                }
+
+                return bRecordExists;
+
+            });
+
+
+
+        }
+
+        #endregion
 
 
 

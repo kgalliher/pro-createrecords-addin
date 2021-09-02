@@ -150,7 +150,6 @@
     <AddInContent Include="DarkImages\AddInDesktop32.png" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CleanupRecord.cs" />
     <Compile Include="AFCLog.cs" />
     <Compile Include="CreateCleanupRecord.cs" />
     <Compile Include="CreateRecordsPane.xaml.cs" />
