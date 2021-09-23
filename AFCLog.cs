@@ -243,7 +243,7 @@ namespace pro_createrecords_addin
             * be called from custom button controls on the xaml UI.                       *
             * ****************************************************************************/
 
-            CreateRecordCommand = new AsyncRelayCommand(func => AsyncCreateNewAFCRecord(), () => this.VALID_AFC_LOG);
+            CreateRecordCommand = new AsyncRelayCommand(func => CreateNewAFCRecordAsync(), () => this.VALID_AFC_LOG);
 
 
         #endregion
@@ -857,7 +857,7 @@ namespace pro_createrecords_addin
         /// </summary>
 
         /// <returns></returns>
-        public async Task AsyncCreateNewAFCRecord()
+        public async Task CreateNewAFCRecordAsync()
         {
 
             bool _cleanupRecordExists = false;    // Boolean variable indicating if a cleanup record exists
@@ -866,23 +866,6 @@ namespace pro_createrecords_addin
 
             try
             {
-
-                // Determine the AFC type.
-
-                // If the type indicates that
-
-                // a cleanup record is being created
-
-                // then some features will be different
-
-                if (_afcTypeCd == NOT_A_LEGAL_CHANGE)
-                {
-
-                    _cleanupRecordExists = CheckCleanupRecordExists(this).Result;
-
-
-                }
-
 
                 // Pass in record name, record type, afctype, 
 
@@ -905,7 +888,22 @@ namespace pro_createrecords_addin
                 int _recordStatus = RECORD_STATUS;
 
 
+                // Determine the AFC type.
 
+                // If the type indicates that
+
+                // a cleanup record is being created
+
+                // then some features will be different
+
+                if (_afcTypeCd == NOT_A_LEGAL_CHANGE)
+                {
+
+                    _name = CreateCleanupRecordName(this);
+                    //_cleanupRecordExists = CheckCleanupRecordExists(this).Result;
+
+
+                }
 
                 if (!_cleanupRecordExists)
                 {
@@ -1110,6 +1108,7 @@ namespace pro_createrecords_addin
 
         #endregion
 
+        
         #region Check if Cleanup Record Already Exists
 
         /// <summary>
@@ -1124,7 +1123,7 @@ namespace pro_createrecords_addin
         /// the tile number and other necessary properties
         /// to create the cleanup record. </param>
         /// <returns></returns>
-        public Task<bool> CheckCleanupRecordExists(AFCLog afclog)
+        public async Task<bool> CheckCleanupRecordExists(AFCLog afclog)
         {
             bool bRecordExists = false;
 
@@ -1133,85 +1132,81 @@ namespace pro_createrecords_addin
             // record name
             string recordName = CreateCleanupRecordName(afclog);
 
-            return QueuedTask.Run(() =>
+            string errorMessage = await QueuedTask.Run(async () =>
             {
-                try { 
+                try
+                {
 
 
-                // Create a new cleanup record name
-                
-                // and assign to the afclog DOC_NUM
-                
-                // property
-                
-                string _cleanupRecordName = CreateCleanupRecordName(afclog);
-                
-                DOC_NUM = _cleanupRecordName;
-                
-                // If the record already exists
-                
-                // return true. It will be set
-                
-                // as the active record in the
-                
-                // create record method.
-                
-                var myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
-                
-                // if there is no fabric in the map then bail
-                
-                if (myParcelFabricLayer == null)
-                
-                    MessageBox.Show("There is no fabric in the map.", "Search Record Name", MessageBoxButton.OK);
-                
-                /**********************************************************************
-                 * Search for the cleanup record. If it exists, then set it as the    *
-                 * active record, otherwise, return a false boolean value indicating  *
-                 * that the record does not exist.                                    *
-                 * *******************************************************************/
-                
-                ParcelRecord theCleanupRecord = myParcelFabricLayer.GetRecordAsync(recordName).Result;
-                
-                if (theCleanupRecord == null)
-                {
-                    bRecordExists = false;
-                    MessageBox.Show($"The cleanup record {recordName} does not exist. " +
-                           $"You may proceed to create the new record.", "Search Record Name", MessageBoxButton.OK);
-                
-                }
-                
-                else
-                
-                {
-                
-                    var bSetActiveRecord = myParcelFabricLayer.SetActiveRecordAsync(recordName);
-                
-                    if (!bSetActiveRecord.Result)
-                        MessageBox.Show($"There was a problem setting the record {recordName} as active.",
-                            "Search Record Name", MessageBoxButton.OK);
-                
-                    MessageBox.Show($"The cleanup record {recordName} already exists. "
-                            + $"Setting as the active record...", "Search Record Name", MessageBoxButton.OK);
-                
-                        }
-                
-                    }       
-                
-                    catch (Exception ex)
-                
+                    // Create a new cleanup record name
+
+                    // and assign to the afclog DOC_NUM
+
+                    // property
+
+                    //string _cleanupRecordName = CreateCleanupRecordName(afclog);
+
+                    DOC_NUM = recordName;
+
+                    // If the record already exists
+
+                    // return true. It will be set
+
+                    // as the active record in the
+
+                    // create record method.
+
+                    ParcelLayer myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
+
+                    /**********************************************************************
+                     * Search for the cleanup record. If it exists, then set it as the    *
+                     * active record, otherwise, return a false boolean value indicating  *
+                     * that the record does not exist.                                    *
+                     * *******************************************************************/
+
+                    ParcelRecord theCleanupRecord = await myParcelFabricLayer.GetRecordAsync(recordName);
+
+                    if (theCleanupRecord == null)
                     {
-                
-                        ErrorLogs.WriteLogEntry("Create Records Add In: Search Record Name", ex.Message, System.Diagnostics.EventLogEntryType.Error);
-                
+                        bRecordExists = false;
+                        return $"The cleanup record {recordName} does not exist.";
+                               
+
                     }
 
-                return bRecordExists;
+                    else
+
+                    {
+
+                        bool bSetActiveRecord = await myParcelFabricLayer.SetActiveRecordAsync(recordName);
+
+                        if (!bSetActiveRecord)
+                           return $"There was a problem setting the record {recordName} as active.";
+
+                        return $"The cleanup record {recordName} already exists. ";
+
+                    }
+
+                }
+
+                catch (Exception ex)
+
+                {
+
+                    ErrorLogs.WriteLogEntry("Create Records Add In: Search Record Name", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+
+                }
+
+                return "";
 
             });
 
+            if (errorMessage.Contains("already exists"))
+            {
+                bRecordExists = true;
+            }
 
-
-
+            return bRecordExists;
 
 
         }
@@ -1388,6 +1383,8 @@ namespace pro_createrecords_addin
             AFCRecordCreatedEventArgs args = new AFCRecordCreatedEventArgs();
             args.RecordName = _afclog.DOC_NUM;
             args.DateCreated = DateTime.Now;
+            args.RecordType = _afclog.RECORD_TYPE;
+            
             AFCRecordCreatedEvent?.Invoke(_afclog, args);
          }
 
@@ -1399,11 +1396,16 @@ namespace pro_createrecords_addin
     }
 
 
-
+    /// <summary>
+    /// Arguments to be passed with
+    /// the AFC record created event
+    /// </summary>
     public class AFCRecordCreatedEventArgs
     {
         public string RecordName { get; set; }
         public DateTime DateCreated { get; set; } 
+
+        public int RecordType { get; set; }
 
     }
 }

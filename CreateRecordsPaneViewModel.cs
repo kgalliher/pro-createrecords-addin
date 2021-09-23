@@ -24,16 +24,8 @@
  * PROPERTIES:   AFCLogs  - The ReadOnlyObservableCollection object that is
  *                          bound to the XAML ListBox object in the 
  *                          CreateRecordsPane.xaml file.
- *               _afclogs - The ObservableCollection object that is manipulated
- *                          in the SearchForAFCLogs() method. The database view
- *                          GEDT.ADM.AFC_LOG_VW is read using a QueryFilter and
- *                          the resulting RowCursor object populates AFC Log class
- *                          objects and adds them to this collection. This property
- *                          is manipulated in the business logic but is not the ultimate
- *                          data source. This property is bounds to the _afclogsRO property
- *                          which is returned by the AFCLogs property bound to the dock pane
- *                          control in the xaml.
- *                          
+
+ *                
 
  *
  * CLASS 
@@ -67,14 +59,11 @@
  *
  * SUPPORTING
  * ONLINE
- * DOCUMENTATION: If online documentation was used to create code in this file, then list them with a brief description here. Use https://bit.ly/ to minimize the URL. 
- *                 (example- (1)) List<double> - https://bit.ly/2wFEESu. A system.collections.generic list object of type double.
- *                 (example- (2)) foreach - https://bit.ly/2T16AZT. An iterator for any object type.
+ * DOCUMENTATION: ControlTemplate - https://bit.ly/2XOiCLw. A template for toggle button control.
  *
  *
  * APPLICABLE
- * STANDARDS: If standards were considered as part of the development they should be listed here with a link if available.
- *            (example- (1) C# Coding Standards - https://bit.ly/r398u779. DCAD standards for C# development.
+ * STANDARDS: C# Coding Standards - https://bit.ly/r398u779. DCAD standards for C# development.
  *
  *
  * ***************************************************************************************************************************************************************
@@ -108,21 +97,33 @@ namespace pro_createrecords_addin
 
         private const string DockPaneID  = "pro_createrecords_addin_CreateRecordsPane";
 
-        private const string Instance = "DCADSQLVM02";
+        private static readonly string Instance = "DCADSQLVM02";
 
-        private const string Database = "GEDT";
+        private static readonly string Database = "GEDT";
 
         private const AuthenticationMode Authentication = AuthenticationMode.OSA;
 
-        private const string Version = "dbo.DEFAULT";
+        private static readonly string Version = "dbo.DEFAULT";
 
-        private const string AFCView = "ADM.AFC_LOG_VW";
+        private static readonly string AFCView = "ADM.AFC_LOG_VW";
 
         private const string Yes = "Y";
 
         private const string Blank = "";
 
-        private const string TileLayerName = "DCAD Tiles";
+        private static readonly string TileLayerName = "DCAD Tiles";
+
+
+        /*********************************************************************************
+        * The _afclogs variable is an ObservableCollection object that is manipulated    *
+        * in the SearchForAFCLogs() method. The database view GEDT.ADM.AFC_LOG_VW is     *
+        * read using a QueryFilter and the resulting RowCursor object populates AFC Log  *
+        * class objects and adds them to this collection. This property is manipulated   *
+        * in the business logic but is not the ultimate data source. This property is    *
+        * bound to the _afclogsRO property which is returned by the AFCLogs property     *
+        * bound to the dock pane  control in the xaml.                                   *
+        * *******************************************************************************/
+
 
         private ObservableCollection<AFCLog> _afclogs = new ObservableCollection<AFCLog>();
 
@@ -162,8 +163,12 @@ namespace pro_createrecords_addin
 
         public CreateRecordsPaneViewModel() 
         {
-            //TODO: Check to ensure that a parcel fabric is
-            // included in the current map and that the AFC Log View exists
+            // Ensure that a parcel fabric is
+            // included in the current map
+            
+
+
+            // and that the AFC Log View exists
             // in the geodatabase
             // Check to ensure that the DCAD tile feature class is in the 
             // current map
@@ -211,12 +216,25 @@ namespace pro_createrecords_addin
 
             try
             {
+                if (!VerifyParcelFabricInMap())
+                {
+
+                    MessageBox.Show("A parcel fabric layer does not exist in the map. Please add a parcel fabric layer and try again. ", "No Parcel Fabric in the Map", MessageBoxButton.OK);
+
+                    ErrorLogs.WriteLogEntry("Create Records Add-In: No Parcel Fabric in the Map", "There was no parcel fabric layer in the map. Please add a parcel fabric and try again.", System.Diagnostics.EventLogEntryType.Error);
+
+                }
+
                 _mapView = MapView.Active;
 
                 if (_mapView is null)
                 {
 
-                    throw new NullReferenceException("The active map view could not be accessed. Verify that a map view is active and try again.");
+                    MessageBox.Show("There was a problem accessing the active map view.", "Active Map View Cannot Be Accessed", MessageBoxButton.OK);
+
+                    ErrorLogs.WriteLogEntry("Create Records Add-In: Active Map View Error", "There was a problem accessing the active map view.", System.Diagnostics.EventLogEntryType.Error);
+
+                    
 
                 }
 
@@ -326,6 +344,100 @@ namespace pro_createrecords_addin
         protected override void OnHelpRequested()
         {
             System.Diagnostics.Process.Start(@"http://dcadwiki.dcad.org/dcadwiki/ArcGISPro-CreateAFCRecords");
+        }
+
+        #endregion
+
+        #region Verify Parcel Fabric Exists in the Map
+
+        /// <summary>
+        /// This method gets a flattended list
+        /// of map layers that are of ParcelLayer
+        /// types. If the result is not null,
+        /// a parcel fabric exists in the map.
+        /// </summary>
+        private bool VerifyParcelFabricInMap()
+        {
+            bool _parcelFabricExists = false;
+
+            try
+            {
+
+                ParcelLayer myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
+
+                //if there is no fabric in the map then bail
+
+                if (myParcelFabricLayer == null)
+                {
+
+                    _parcelFabricExists = false;
+
+                }
+
+                else
+                {
+                    _parcelFabricExists = true;
+                }
+
+
+            }
+            catch (Exception ex)
+            {
+
+                ErrorLogs.WriteLogEntry("Create Records Add-In: Verify Parcel Fabric Exists in the Map", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+            }
+
+
+            return _parcelFabricExists;
+
+
+        }
+
+        #endregion
+
+        #region Verify Parcel Fabric Exists in the Map
+
+        /// <summary>
+        /// This method gets a flattended list
+        /// of map layers that are of ParcelLayer
+        /// types. If the result is not null,
+        /// a parcel fabric exists in the map.
+        /// </summary>
+        private bool VerifyAFCLogViewExistsInGDB()
+        {
+            bool _parcelFabricExists = false;
+            //TODO: Complete this method
+            try
+            {
+
+                ParcelLayer myParcelFabricLayer = MapView.Active.Map.GetLayersAsFlattenedList().OfType<ParcelLayer>().FirstOrDefault();
+
+                //if there is no fabric in the map then bail
+
+                if (myParcelFabricLayer == null)
+                {
+
+                    _parcelFabricExists = false;
+
+                }
+
+                else
+                {
+                    _parcelFabricExists = true;
+                }
+
+
+            }
+            catch (Exception ex)
+            {
+
+                ErrorLogs.WriteLogEntry("Create Records Add-In: Verify Parcel Fabric Exists in the Map", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+            }
+
+
+            return _parcelFabricExists;
+
+
         }
 
         #endregion
@@ -715,8 +827,18 @@ namespace pro_createrecords_addin
         {
             try
             {
+                if (e.RecordType == 28)
+                {
+                    SearchingAFeatureLayer(_mapView);
+                }
 
-                AsyncSearchForAFCLogs();
+                else
+                {
+
+                    AsyncSearchForAFCLogs();
+
+                }
+
 
             }
             catch (Exception exception)
@@ -834,19 +956,20 @@ namespace pro_createrecords_addin
             string _cleanupRecordType = "CLEANUP RECORD";    // Defines the record type
             int _afcTypeCd = 4;                              // Not a legal change AFC Type code
             int _afcCount = 0;                               // Counter for total tiles added to pane
+            bool _lyrExists;                                 // Boolean variable showing the Tile layer exists
 
 
             // This returns a collection of layers of the "name" specified.
 
             // You can use any Linq expression to query the collection.  
 
-            var lyrExists = MapManagement.ConfirmTOCLayer(TileLayerName);
+            _lyrExists = MapManagement.ConfirmTOCLayer(TileLayerName);
 
 
             // If the tile layer exists
             // then create a spatial filter
             // to query the layer
-            if (lyrExists)
+            if (_lyrExists)
             {
 
                 await QueuedTask.Run(() => {
@@ -876,6 +999,8 @@ namespace pro_createrecords_addin
                         
                             using (Feature feature = (Feature)tileCursor.Current)
                                 {
+                                    // Check if cleanup record exists
+
                                     // Add the tile name to the AFC logs
                                     
                                     // observable collection
@@ -903,6 +1028,16 @@ namespace pro_createrecords_addin
                                     afcLog.SetRecordStatus();   // Method that sets the record status for the afc log
                                     
                                     /***************************************
+                                     * If a cleanup record already exists  *
+                                     * for this tile and was created today *
+                                     * having the same record name, then   *
+                                     * color the text red and assign the   *
+                                     * message to account number property  *
+                                     * ************************************/
+
+
+
+                                    /***************************************
                                     * Subscribe to AFCRecordCreated Event  *
                                     * in the AFCRecord class.              *
                                     * *********************************** */
@@ -928,6 +1063,7 @@ namespace pro_createrecords_addin
                                 $"Please check your layers and try again.");
             }
         }
+
 
         #endregion Searching a Feature Layer using SpatialQueryFilter
 

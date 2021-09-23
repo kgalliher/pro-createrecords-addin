@@ -63,9 +63,20 @@ SELECT  AFC.AFC_LOG_ID
 		*   to the mars database is supplied  *
 		*   (e.g., GSDVSQL01.DBPROD.DBO..)    *
 	    **************************************/
+
+
+	   /************************************
+	   * This left outer join checks for a *
+	   * the afc log's instrument number in*
+	   * the DEED_MAIN table in order to   *
+	   * get the deed type. Research forms *
+	   * will not always have an instrument*
+	   * number so this has to be a left   *
+	   * join                              *
+	   *************************************/
 	   FROM GSDVSQL01.DBPROD.DBO.AFC_LOG AFC  
 
-	   INNER JOIN
+	   LEFT OUTER JOIN
 
 	   GSDVSQL01.DBPROD.DBO.DEED_MAIN DEED
 
