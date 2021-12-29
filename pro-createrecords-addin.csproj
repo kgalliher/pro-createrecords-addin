@@ -154,6 +154,7 @@
     <Compile Include="CreateCleanupRecord.cs" />
     <Compile Include="CreateRecordsPane.xaml.cs" />
     <Compile Include="CreateRecordsPaneViewModel.cs" />
+    <Compile Include="DataLibrary.cs" />
     <Compile Include="ErrorLogs.cs" />
     <Compile Include="MapManagement.cs" />
     <Compile Include="Module1.cs" />

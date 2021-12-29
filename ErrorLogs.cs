@@ -95,9 +95,11 @@ namespace pro_createrecords_addin
 
         #region Public Constants
 
-        public const string _eventLogSourceName = "Application";  // Name of event viewer Application log.
+        public const string EventLogSourceName = "Create Records Add-In";  // Name of event log source.
 
-        public const string _smtpServer = "dcadex13.dcad.org";    // Host name of exchange server.
+        public const string EventLogName = "Application"; // Name of event viewer Application log.
+
+        public const string SmtpServer = "dcadex13.dcad.org";    // Host name of exchange server.
 
 
 
@@ -126,6 +128,8 @@ namespace pro_createrecords_addin
         // This subroutine writes an entry to an existing event log on the local machine.
         #endregion
 
+        #region Write Message to Event Log
+
         public static void WriteLogEntry(String appSourceName, String entry, EventLogEntryType entryType)
         {
 
@@ -136,17 +140,32 @@ namespace pro_createrecords_addin
 
                 // Check if event log exists
 
-                if (EventLog.SourceExists(_eventLogSourceName))
+                if (!EventLog.SourceExists(appSourceName))
 
                 {
 
-                    EventLog eventLog = new EventLog(_eventLogSourceName);   // Reference event log.
+                    // Create the event log source
+
+                    EventLog.CreateEventSource(appSourceName, EventLogName);
+
+                    System.Threading.Thread.Sleep(2000);
+
+
+                }
+
+                if (EventLog.SourceExists(appSourceName))
+
+                {
+
+                    EventLog eventLog = new EventLog();   // Reference event log.
 
                     eventLog.Source = appSourceName;                        // Define app source.
 
                     eventLog.WriteEntry(entry, entryType);                  // Write log entry. 
 
                 }
+
+
 
 
 
@@ -161,7 +180,7 @@ namespace pro_createrecords_addin
 
             }
 
-
+            #endregion
 
 
         }

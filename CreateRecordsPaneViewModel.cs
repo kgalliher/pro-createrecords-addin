@@ -97,6 +97,8 @@ namespace pro_createrecords_addin
 
         private const string DockPaneID  = "pro_createrecords_addin_CreateRecordsPane";
 
+        private const string EventLogSourceName = "Create Records Add-In";
+
         private static readonly string Instance = "DCADSQLVM02";
 
         private static readonly string Database = "GEDT";
@@ -112,6 +114,8 @@ namespace pro_createrecords_addin
         private const string Blank = "";
 
         private static readonly string TileLayerName = "DCAD Tiles";
+
+        private static readonly int CleanupRecordType = 28;
 
 
         /*********************************************************************************
@@ -193,6 +197,7 @@ namespace pro_createrecords_addin
             BindingOperations.EnableCollectionSynchronization(_afcLogsRO, _lockObj);
 
 
+            
             // Call SearchForAFCLogs
             
             AsyncSearchForAFCLogs();
@@ -221,7 +226,7 @@ namespace pro_createrecords_addin
 
                     MessageBox.Show("A parcel fabric layer does not exist in the map. Please add a parcel fabric layer and try again. ", "No Parcel Fabric in the Map", MessageBoxButton.OK);
 
-                    ErrorLogs.WriteLogEntry("Create Records Add-In: No Parcel Fabric in the Map", "There was no parcel fabric layer in the map. Please add a parcel fabric and try again.", System.Diagnostics.EventLogEntryType.Error);
+                    ErrorLogs.WriteLogEntry(EventLogSourceName, "There was no parcel fabric layer in the map. Please add a parcel fabric and try again.", System.Diagnostics.EventLogEntryType.Error);
 
                 }
 
@@ -232,7 +237,7 @@ namespace pro_createrecords_addin
 
                     MessageBox.Show("There was a problem accessing the active map view.", "Active Map View Cannot Be Accessed", MessageBoxButton.OK);
 
-                    ErrorLogs.WriteLogEntry("Create Records Add-In: Active Map View Error", "There was a problem accessing the active map view.", System.Diagnostics.EventLogEntryType.Error);
+                    ErrorLogs.WriteLogEntry(EventLogSourceName, "There was a problem accessing the active map view.", System.Diagnostics.EventLogEntryType.Error);
 
                     
 
@@ -244,7 +249,7 @@ namespace pro_createrecords_addin
 
             {
 
-                ErrorLogs.WriteLogEntry("Create Records Add In: Error Accessing Active Map View", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                ErrorLogs.WriteLogEntry(EventLogSourceName, ex.Message, System.Diagnostics.EventLogEntryType.Error);
 
             }
             
@@ -384,7 +389,7 @@ namespace pro_createrecords_addin
             catch (Exception ex)
             {
 
-                ErrorLogs.WriteLogEntry("Create Records Add-In: Verify Parcel Fabric Exists in the Map", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                ErrorLogs.WriteLogEntry(EventLogSourceName, ex.Message, System.Diagnostics.EventLogEntryType.Error);
             }
 
 
@@ -431,7 +436,7 @@ namespace pro_createrecords_addin
             catch (Exception ex)
             {
 
-                ErrorLogs.WriteLogEntry("Create Records Add-In: Verify Parcel Fabric Exists in the Map", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                ErrorLogs.WriteLogEntry(EventLogSourceName, ex.Message, System.Diagnostics.EventLogEntryType.Error);
             }
 
 
@@ -504,7 +509,7 @@ namespace pro_createrecords_addin
 
             }
 
-            await QueuedTask.Run(async () =>
+            await QueuedTask.Run(() =>
             {
                 /************************************************************************
                  * Get a list of AFC Logs                                               *
@@ -516,14 +521,14 @@ namespace pro_createrecords_addin
                 if (_cleanupRecord)
                 {
 
-                    await SearchingAFeatureLayer(_mapView);
+                    SearchingAFeatureLayer(_mapView);
 
                 }
 
                 else
                 {
 
-                    await PopulateAFCLogCollection (_searchString);
+                    PopulateAFCLogCollection (_searchString);
 
                 }
 
@@ -533,17 +538,19 @@ namespace pro_createrecords_addin
                 // and apply search string
                 
                 // if provided
+
+                // TODO: Fix the search capability (duplicates entries when backspacing?)
                 
                 IEnumerable<AFCLog> linqResults;
 
                 if (_searchString != Blank)
                 {
-                    linqResults = _afclogs.Where(afc => afc.DOC_NUM.Contains(_searchString));
+                    linqResults = _afclogs.Where(afc => afc.DOC_NUM.Contains(_searchString) || afc.SEQ_NUM.Contains(_searchString));
 
                 }
                 else
                 {
-                    linqResults = _afclogs.Where(afc => afc.AFC_LOG_ID >= 0);
+                    linqResults = _afclogs.Where(afc => afc.AFC_LOG_ID > 0);
                 }
 
                     // Create a temporary observable collection
@@ -575,36 +582,36 @@ namespace pro_createrecords_addin
                         }
                 }
 
-                    // Now add any items that are included in
-                    
-                    // the temporary collection that are not in
-                    
-                    // the original collection in the case of a
-                    
-                    // backspace
-                    
-                    foreach (var item in _tempafclogs)
+                // Now add any items that are included in
+
+                // the temporary collection that are not in
+
+                // the original collection in the case of a
+
+                // backspace
+
+                foreach (var item in _tempafclogs)
+                {
+                    if (!_afclogs.Contains(item))
                     {
-                        if (!_afclogs.Contains(item))
+                        lock (_lockObj)
                         {
-                            lock (_lockObj)
-                            {
-                                _afclogs.Add(item);
-                            }
-
+                            _afclogs.Add(item);
                         }
+
                     }
+                }
 
-                    /**********************************************
-                     * Remove any items that are included in
-                     * the records collection because these
-                     * have already had a record created
-                     * during this session.
-                     * *******************************************/
+                /**********************************************
+                 * Remove any items that are included in
+                 * the records collection because these
+                 * have already had a record created
+                 * during this session.
+                 * *******************************************/
 
-                 // Remove temporary observable collection
-                 
-                 _tempafclogs = null;
+                // Remove temporary observable collection
+
+                _tempafclogs = null;
                 
 
 
@@ -804,11 +811,11 @@ namespace pro_createrecords_addin
                 
                 // Handle error appropriately
                 
-                ErrorLogs.WriteLogEntry("Create Records Add-In: Populate AFC Log Collection", fieldException.Message, System.Diagnostics.EventLogEntryType.Error);
+                ErrorLogs.WriteLogEntry(EventLogSourceName, fieldException.Message, System.Diagnostics.EventLogEntryType.Error);
             }
             catch (Exception exception)
             {
-                ErrorLogs.WriteLogEntry("Create Records Add-In: Populate AFC Log Collection", exception.Message, System.Diagnostics.EventLogEntryType.Error);
+                ErrorLogs.WriteLogEntry(EventLogSourceName, exception.Message, System.Diagnostics.EventLogEntryType.Error);
             }
         }
 
@@ -827,7 +834,7 @@ namespace pro_createrecords_addin
         {
             try
             {
-                if (e.RecordType == 28)
+                if (e.RecordType == CleanupRecordType)
                 {
                     SearchingAFeatureLayer(_mapView);
                 }
@@ -844,7 +851,7 @@ namespace pro_createrecords_addin
             catch (Exception exception)
             {
 
-                ErrorLogs.WriteLogEntry("Create Records Add-In: OnAFCRecordCreated Event Handler", exception.Message, System.Diagnostics.EventLogEntryType.Error);
+                ErrorLogs.WriteLogEntry(EventLogSourceName, exception.Message, System.Diagnostics.EventLogEntryType.Error);
             }
 
         }

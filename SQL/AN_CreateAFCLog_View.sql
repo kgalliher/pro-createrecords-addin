@@ -28,15 +28,8 @@
 USE GEDT
 GO
 
-/************************************************************** 
-*  DELETE VIEW IF IT EXISTS                                   *
-*  Note: Only works in MS SQL Server 2016 and later           *
-**************************************************************/
-DROP VIEW IF EXISTS [ADM].[AFC_LOG_VW]
-GO
-
 /* VIEW DEFINITION */
-CREATE VIEW [ADM].[AFC_LOG_VW]
+CREATE OR ALTER VIEW [ADM].[AFC_LOG_VW]
 AS
 SELECT  AFC.AFC_LOG_ID
        ,AFC.AFC_YEAR
