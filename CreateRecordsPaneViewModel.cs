@@ -303,7 +303,7 @@ namespace pro_createrecords_addin
         }
 
         /// <summary>
-        /// Search string used to limit the returned symbols.
+        /// Search string used to limit the returned AFC logs.
         /// </summary>
         private string _searchString = "";
         public string SearchString
@@ -316,7 +316,9 @@ namespace pro_createrecords_addin
             {
                 SetProperty(ref _searchString, value, () => SearchString);
 
-                //Call SearchForAFCLogs
+                // When the user enters values into
+                // the search box, this method
+                // will update the resulting list
                 
                 AsyncSearchForAFCLogs(_searchString);
 
@@ -553,11 +555,13 @@ namespace pro_createrecords_addin
                     linqResults = _afclogs.Where(afc => afc.AFC_LOG_ID > 0);
                 }
 
-                    // Create a temporary observable collection
-                    
-                    // for filtering
-                    
-                    ObservableCollection<AFCLog>_tempafclogs;
+
+
+                // Create a temporary observable collection
+
+                // for filtering
+
+                ObservableCollection<AFCLog>_tempafclogs;
 
                     // Filter the items in the existing observable collection
                     
@@ -648,8 +652,6 @@ namespace pro_createrecords_addin
             string _seqNum = "SEQ_NUM";
             
             string _afcLogID = "AFC_LOG_ID";
-            
-            int _afcCount = 0;
             
             string _whereClause = Blank;
             
@@ -785,8 +787,6 @@ namespace pro_createrecords_addin
 
                                         afcLog.SetForegroundColor(_acctNumTYpe);
 
-                                        _afcCount += 1;             // Increment afc count variable
-
                                         // Reads and Writes should be made from within the lock
 
                                         lock (_lockObj)
@@ -800,7 +800,7 @@ namespace pro_createrecords_addin
                     }
                     // If completed, add psuedo afc log if count is zero
                     
-                    AddEmptyListAFCLog(_afcCount);
+                    AddEmptyListAFCLog(_afclogs.Count);
                 });
             }
             catch (GeodatabaseFieldException fieldException)

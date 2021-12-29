@@ -91,7 +91,8 @@
 
                 <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
-                        <ui:VirtualizingWrapPanel Orientation="Horizontal" />
+                        <!--<ui:VirtualizingWrapPanel Orientation="Horizontal" />-->
+                        <VirtualizingStackPanel Orientation="Vertical" />
                     </ItemsPanelTemplate>
             </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>

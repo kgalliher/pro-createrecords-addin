@@ -79,6 +79,9 @@
     <Reference Include="System.Xml" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
+    <Reference Include="VirtualizingWrapPanel, Version=1.5.7.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\VirtualizingWrapPanel.1.5.7\lib\net452\VirtualizingWrapPanel.dll</HintPath>
+    </Reference>
     <Reference Include="WindowsBase" />
     <Reference Include="System.Xaml" />
     <Reference Include="ArcGIS.Desktop.Framework">
@@ -160,7 +163,6 @@
     <Compile Include="Module1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RefreshList.cs" />
-    <Compile Include="VirtualizingWrapPanel.cs" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Images\addition_document_64px.png" />

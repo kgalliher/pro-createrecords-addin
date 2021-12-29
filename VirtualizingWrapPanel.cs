@@ -175,6 +175,7 @@ namespace pro_createrecords_addin
                 MeasureOverride(_viewport);
                 SetFirstRowViewItemIndex(firstIndex);
                 firstIndex = firstIndexCache;
+
             }
         }
 
