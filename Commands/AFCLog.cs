@@ -117,6 +117,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using DCAD.GIS;
 
 namespace pro_createrecords_addin
 {
@@ -233,7 +234,7 @@ namespace pro_createrecords_addin
             _recordType = 0;
             _recordStatus = 0;
             _validafclog = true;
-            _msgClrDocNum = Color.FromRgb(0, 0, 0); ;
+            _msgClrDocNum = Color.FromRgb(0, 0, 0); 
             _msgClrAcctNum = Color.FromRgb(128, 128, 128);
 
             /******************************************************************************
@@ -768,10 +769,10 @@ namespace pro_createrecords_addin
                 switch (_afcStatusCd)
                 {
                     case 4:                            // Cert Hold
-                        _recordStatus = 1;
+                        _recordStatus = 2;
                         break;
                     default:                          // Not Cert Hold
-                        _recordStatus = 0;
+                        _recordStatus = 1;
                         break;
                 }
             }
@@ -832,8 +833,8 @@ namespace pro_createrecords_addin
                 }
                 catch (Exception ex)
                 {
-                
-                    ErrorLogs.WriteLogEntry("Create New Record Add-In: Set Foreground Color", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+
+                OS.WriteLogEntry(OS.EventLogSourceName, ex.Message, System.Diagnostics.EventLogEntryType.Error);
                 }
 
         }
@@ -988,7 +989,7 @@ namespace pro_createrecords_addin
 
                     {
 
-                        ErrorLogs.WriteLogEntry("Create New Record Add-In: Create New AFC Record", errorMessage, System.Diagnostics.EventLogEntryType.Error);
+                        OS.WriteLogEntry(OS.EventLogSourceName, errorMessage, System.Diagnostics.EventLogEntryType.Error);
 
                     }
                     else if (_afcTypeCd == NOT_A_LEGAL_CHANGE)
@@ -1018,7 +1019,7 @@ namespace pro_createrecords_addin
             catch (Exception ex)
             {
 
-                ErrorLogs.WriteLogEntry("Create New Record Add-In: Create New AFC Record", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                OS.WriteLogEntry(OS.EventLogSourceName, ex.Message, System.Diagnostics.EventLogEntryType.Error);
             }
 
             finally
@@ -1191,7 +1192,7 @@ namespace pro_createrecords_addin
 
                 {
 
-                    ErrorLogs.WriteLogEntry("Create Records Add In: Search Record Name", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                    DCAD.GIS.OS.WriteLogEntry("Create Records Add In: Search Record Name", ex.Message, System.Diagnostics.EventLogEntryType.Error);
 
                 }
 
@@ -1277,7 +1278,7 @@ namespace pro_createrecords_addin
 
                 {
 
-                    ErrorLogs.WriteLogEntry("Create Records Add In: Search Record Name", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                    OS.WriteLogEntry(OS.EventLogSourceName, ex.Message, System.Diagnostics.EventLogEntryType.Error);
 
                 }
 
@@ -1361,7 +1362,7 @@ namespace pro_createrecords_addin
             catch (Exception ex)
             {
 
-                ErrorLogs.WriteLogEntry("Create Records Add-In", ex.Message, System.Diagnostics.EventLogEntryType.Error);
+                DCAD.GIS.OS.WriteLogEntry("Create Records Add-In", ex.Message, System.Diagnostics.EventLogEntryType.Error);
             }
 
 
