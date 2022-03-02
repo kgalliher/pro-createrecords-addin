@@ -90,29 +90,7 @@ in the Add-Ins tab with the title **Show Create AFC Records Dock Pane**.
     an existing record. Make sure that record for the specific AFC log does 
     not already exist or that the AFC log has been assigned to you in Message 
     Central.
- 4. 
-
-
-Once added, the geoprocessing tool named *Synchronize Street Addresses 1.0.0* may be used 
-either independently or within an ArcGIS Pro task. 
-
-
-> #### Warning: 
-> There is a limit of 25 or more rows that will be inserted at one time from the sync street address view into the street information table.
-> 
-
-If within a [task](https://bit.ly/3f1EpUC), there is no user input
-required, so it can be a task hidden to the user. If the tool fails, it will report
-warnings or errors to the display. If there are no rows in the view to 
-be synchronized then a warning is displayed alerting the user. This can
-be supressed when used in a task because the user does not need to know.
-
-
-
-
-
-
-
+ 
 ----
 ## Revision History
 
